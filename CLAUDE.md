@@ -31,18 +31,33 @@ before you do it, and let them do the taps on the TV.
    (some firmware calls the operation `APP_AUTO_START`; this tries both):
    TCL's `TclAppBoot` blocks background jobs by default, so the switch (and the watchdog) never run. The log shows
    `forbid bind service ... ModeJob`.
-7. **Tell them what the switch does** before they make it: the home screen and screensaver change, a short list of
+7. **OpenTV, the IPTV player** (third on the shelf, next to YouCine): `tools/install-opentv.sh <IP>`. The script finds
+   the APK in `apps/OpenTV.apk` or in a sibling checkout of the OpenTV project (`../opentv/dist`, where it is built
+   with `./gradlew assembleRelease`). The APK has to be signed with the same key as the one already on the TV, or
+   Android refuses to replace it. On TCL, also `adb shell "appops set app.opentv AUTO_START allow || appops set app.opentv APP_AUTO_START allow"`
+   — OpenTV records to disk and keeps a wake lock while it does, and TCL's `TclAppBoot` stops background jobs.
+8. **Tell them what the switch does** before they make it: the home screen and screensaver change, a short list of
    promo apps is turned off (never uninstalled), and *Original* brings it all back. On TCL, the remote's Netflix,
    YouTube and Prime buttons keep working through a small accessibility service that only reads those buttons
    (*Free My TV* → *Remote Buttons* picks what each opens); *Original* turns it off.
-8. **They switch on the TV:** *Free My TV* → *Home Screen* → *Free My TV*. The app uses the TV's own ADB on
+9. **They switch on the TV:** *Free My TV* → *Home Screen* → *Free My TV*. The app uses the TV's own ADB on
    127.0.0.1 with its own key, so the TV asks once more to allow debugging. Don't switch modes from the computer.
-   If the TV's Wi-Fi was saved during its first setup, the switch stops before changing anything and asks them to
-   forget the network and connect again in Settings (Network & Internet); then the switch goes through. Saved
-   networks out of range don't show in Settings: find the ones with `cname=com.google.android.tungsten.setupwraith`
-   in `adb shell dumpsys wifi` (each block starts with its `ID:`), and with their OK remove them with
-   `adb shell cmd wifi forget-network <id>`.
-9. **Check:** `adb logcat -s FreeMyTV` shows what the switch did.
+
+   **If the switch stops and asks them to forget the Wi-Fi**, it is the app protecting the network, not a bug. When
+   Android turns off an app, it also deletes the Wi-Fi networks that app saved. The switch turns off the TV's first
+   setup (Google TV's setup wizard), and that is the app that saved the network during the setup — so the switch
+   would take the TV offline for good, and *Original* re-enables apps but cannot bring a deleted network back. The
+   app therefore stops before changing anything.
+
+   The fix is to make the network belong to someone else. On the TV: *Settings* → *Network & Internet* → the
+   network → *Forget*, then connect to it again with the password. Now the Settings app owns it, and the Settings
+   app is never turned off (it is on the protected list), so the network survives the switch. Then try again.
+
+   A saved network that is out of range doesn't show in the TV's list — the TV only lists the ones it can see. Those
+   have to go from the computer: `adb shell dumpsys wifi` shows every saved network as a block that starts with
+   `* ID: <n> SSID: "<name>"` and ends with `cname=<the package that saved it>`; the ones from the TV's first
+   setup say `cname=com.google.android.tungsten.setupwraith`. With their OK, `adb shell cmd wifi forget-network <n>`.
+10. **Check:** `adb logcat -s FreeMyTV` shows what the switch did.
 
 ## Adapting it to another TV
 
@@ -95,6 +110,34 @@ TVs that don't run Google TV or Android TV (Samsung, LG and others): the way is 
   What the person changes on the TV (`Prefs`: Home Settings, Shelf, Remote Buttons) wins over those first values.
 - The remote's app buttons (`RemoteKeys`, `RemoteKeyService`) use TCL's key codes: they run only on TCL TVs, the
   service is on only in Free My TV mode, and *Original* takes it out of the enabled accessibility services.
+- The remote's app buttons (`RemoteKeys`, `RemoteKeyService`, `RemoteKeyReceiver`): the TV's IR receiver says it is a
+  gamepad ("KEYBOARD | DPAD | GAMEPAD"), so the source of the key says nothing about it — do not filter by the source,
+  only by the key code (the controller's own buttons). The key codes are the TV's: on this TCL they are 265 (Netflix),
+  4065 (YouTube), 4099 (Prime Video), 4141, 4097 and 4020 (TCL Channel) — not the 4062/190/4099 the defaults have.
+  The app learns them: a button it does not know is remembered and shows up in *Botões do Controle* ("Botão 265"),
+  where the person picks the app for it. Two ways in: the keys that reach the app layer (the accessibility service)
+  and the ones the TV's own window manager grabs first (it says so in a broadcast, "com.tcl.TCLkeyevent" and
+  "tcl.sys.intent.action.USERSTATE_KEYDOWN" — `RemoteKeyReceiver` listens, registered at runtime, because a
+  receiver in the manifest does not get implicit broadcasts since Android 8).
+- The picks open Nuvio on the title (`nuvio://meta?type=movie&id=tt…`). Nuvio comes in two builds: the Play Store
+  one is `com.nuvio.app`, the one from GitHub is `com.nuvio.tv` — the app looks for both (`HomeApps.nuvioPackage`).
+- How many titles the home screen shows in each tab: *Ajustes do Início* → *Títulos na tela* (3, 5 or 8). The row of
+  cards slides sideways when there are more than fit; only the cards on screen get their picture (each one is a 4K
+  download and a blur).
+- The games of the day (`Games.java`): two sources. API-Football (the key in `config.properties`, `api_football_key`)
+  for the football — the teams' crests, the league and its country; it wants the date as "2026-10-21" and the
+  timezone, and the free plan only serves a few days around today. ESPN's public scoreboard (no key) for the TV
+  channel — it publishes the network of each game, mostly the American one, so the country is shown with a flag
+  (from flagcdn.com; the flag emoji does not render on the TV) — and for the sports API-Football does not serve
+  here (American football and MMA). The two are matched by the league and the closest time (the channel is the
+  same for the whole round). The crests come from ESPN (its host resolves everywhere; the API's does not).
+  The list is kept in a file (`games.json`, with a version number: bump it when the data changes, or the old file
+  is kept).
+- The games have their own focus springs (`gameFocus`): without them the screen is not redrawn when the focus
+  moves in the list, and it feels frozen. The texts are measured once, when the list changes (no allocations while
+  drawing).
+- The surprise (`HomeApps.SHUFFLE`): the button in the corner opens a small panel (movie or series) and opens a random
+  title of that kind in Nuvio, on the title itself.
 - After any change, `./build.sh` must end with `Built FreeMyTV.apk`.
 
 ## Always

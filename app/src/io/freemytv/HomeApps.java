@@ -24,6 +24,7 @@ import android.graphics.drawable.Drawable;
 import android.media.tv.TvContract;
 import android.media.tv.TvInputInfo;
 import android.media.tv.TvInputManager;
+import android.net.Uri;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.view.View;
@@ -55,6 +56,8 @@ final class HomeApps {
     private HomeApps() {}
 
     static final int APP = 0, LIVE_TV = 1, INPUT = 2, ALL_APPS = 3, SETTINGS = 4, ANDROID_SETTINGS = 5;
+    /** The surprise: a random title (the home screen asks which kind). */
+    static final int SHUFFLE = 6;
     /** The "HDMI Inputs" button: opens the bottom drawer on the inputs (the home screen handles it). */
     static final int INPUTS = 7;
     /** Image size of each card (16:9; on screen it shows up to ~330 px wide). */
@@ -63,6 +66,7 @@ final class HomeApps {
     static final class Item {
         int kind;
         String key, label, pkg, inputId, number;
+        String deeplink;    // Nuvio only: its own link for the title (nuvio://meta?...) instead of the app's front door
         String symbol;      // icon for the shortcuts and special cards
         Bitmap tile;        // 16:9 card (apps and specials)
         Bitmap logo;        // colored logo with no background (shelf); null = use the card
@@ -79,6 +83,11 @@ final class HomeApps {
      * (YouTube); empty = the art's colors as they are. Last, a visual size tweak for the logo. Edit freely.
      */
     private static final String[][] SHELF = {
+        // The apps this TV is set up around come first: Nuvio (where a pick opens when no app of ours has the title),
+        // then the YouCine and OpenTV players. Reorder or remove them in Free My TV > Shelf.
+        {"nuvio", "Nuvio", "com.nuvio.tv", "8B5CF6", "", "1"},
+        {"youcine", "YouCine", "com.world.youcinetv", "FFB300", "", "1"},
+        {"opentv", "OpenTV", "app.opentv", "7C93FF", "", "1"},
         {"netflix", "Netflix", "com.netflix.ninja", "E50914", "", "1"},
         {"youtube", "YouTube", "com.google.android.youtube.tv", "FF0033", "play", "1"},
         {"prime", "Prime Video", "com.amazon.amazonvideo.livingroom", "1A98FF", "tint", "0.96"},
@@ -94,6 +103,12 @@ final class HomeApps {
     static final int MAX_SHELF = 8;
     /** Live TV apps of some brands (the antenna's channels open through the standard Android request first). */
     static final String[] LIVE_TV_APPS = {"com.tcl.tv", "com.google.android.tv", "com.mediatek.wwtv.tvcenter", "com.sony.dtv.tvx"};
+    /**
+     * Nuvio: a Stremio-compatible client. A pick with no app of ours opens here, on the title itself. It comes in
+     * two builds: the one on the Play Store (com.nuvio.app) and the one from GitHub (com.nuvio.tv).
+     */
+    static final String NUVIO = "com.nuvio.tv";
+    private static final String NUVIO_PLAY = "com.nuvio.app";
     /** Kept out of "All Apps" (only hidden, still installed). Add the ones your TV shows that you never use. */
     private static final Set<String> HIDDEN = new HashSet<>(java.util.Arrays.asList(
             "com.google.android.play.games",        // Google Play Games
@@ -144,7 +159,37 @@ final class HomeApps {
 
     private static String[] known(String pkg) {
         for (String[] d : SHELF) if (d[2].equals(pkg)) return d;
+        // Nuvio's Play Store build has another package, but it is the same app: same logo, same card.
+        if (NUVIO_PLAY.equals(pkg)) {
+            for (String[] d : SHELF) {
+                if (!NUVIO.equals(d[2])) continue;
+                String[] copy = d.clone();
+                copy[2] = pkg;
+                return copy;
+            }
+        }
         return null;
+    }
+
+    /** The Nuvio build on this TV, or "" when it is not installed. */
+    static String nuvioPackage(Context c) {
+        PackageManager pm = c.getPackageManager();
+        for (String pkg : new String[] {NUVIO_PLAY, NUVIO}) {
+            if (launchIntent(pm, pkg) != null) return pkg;
+        }
+        return "";
+    }
+
+    /** Whether this package is Nuvio (either build). */
+    static boolean isNuvio(String pkg) {
+        return NUVIO.equals(pkg) || NUVIO_PLAY.equals(pkg);
+    }
+
+    /** The package that really is on the TV: Nuvio has two builds. */
+    static String realPackage(Context c, String pkg) {
+        if (!NUVIO.equals(pkg)) return pkg;
+        String nuvio = nuvioPackage(c);
+        return nuvio.isEmpty() ? pkg : nuvio;
     }
 
     /** The shelf's packages in order: the user's list (Settings > Shelf), or the built-in one. */
@@ -153,7 +198,11 @@ final class HomeApps {
         if (custom != null) return custom;
         List<String> out = new ArrayList<>();
         PackageManager pm = c.getPackageManager();
-        for (String[] d : SHELF) if (out.size() < MAX_SHELF && launchIntent(pm, d[2]) != null) out.add(d[2]);
+        for (String[] d : SHELF) {
+            if (out.size() >= MAX_SHELF) break;
+            String pkg = realPackage(c, d[2]);
+            if (launchIntent(pm, pkg) != null) out.add(pkg);
+        }
         return out;
     }
 
@@ -162,7 +211,10 @@ final class HomeApps {
         PackageManager pm = c.getPackageManager();
         List<String[]> out = new ArrayList<>();
         Set<String> seen = new HashSet<>();
-        for (String[] d : SHELF) if (launchIntent(pm, d[2]) != null && seen.add(d[2])) out.add(new String[] {d[2], d[1]});
+        for (String[] d : SHELF) {
+            String pkg = realPackage(c, d[2]);
+            if (launchIntent(pm, pkg) != null && seen.add(pkg)) out.add(new String[] {pkg, d[1]});
+        }
         List<String[]> more = new ArrayList<>();
         Intent query = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
         for (ResolveInfo ri : pm.queryIntentActivities(query, 0)) {
@@ -221,6 +273,13 @@ final class HomeApps {
         it.key = pkg;
         it.pkg = pkg;
         it.label = label;
+        return it;
+    }
+
+    /** A pick, as the item its card opens: the service's app, or Nuvio already on that title. */
+    static Item app(Recs.Pick p) {
+        Item it = app(p.pkg, Recs.serviceName(p));
+        if (isNuvio(p.pkg)) it.deeplink = Recs.nuvioUri(p);
         return it;
     }
 
@@ -348,34 +407,53 @@ final class HomeApps {
 
     /** Opens the item with the system zoom transition growing out of the card (the app starts opening right away). */
     static boolean open(Activity a, Item it, View from, int x, int y, int w, int h) {
-        Intent intent;
+        Intent intent = intentFor(a, it);
+        if (intent == null) return false;
+        if (start(a, intent, from, x, y, w, h)) return true;
+        // The title's own link did not open (an older Nuvio, say): open the app's front door instead of nothing.
+        if (it.deeplink != null) {
+            Intent front = launchIntent(a.getPackageManager(), it.pkg);
+            if (front != null) {
+                AppLog.w("opening " + it.label + " without the title's link");
+                return start(a, front.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), from, x, y, w, h);
+            }
+        }
+        return false;
+    }
+
+    /** The intent that opens the item: the app's front door, or Nuvio's own link for the title. */
+    private static Intent intentFor(Activity a, Item it) {
         switch (it.kind) {
             case APP:
-                intent = launchIntent(a.getPackageManager(), it.pkg);
-                if (intent != null) intent.addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-                break;
+                if (it.deeplink != null) {
+                    // Nuvio, on this exact title: its own link (it is a Stremio-compatible client).
+                    return new Intent(Intent.ACTION_VIEW, Uri.parse(it.deeplink)).setPackage(it.pkg);
+                }
+                Intent app = launchIntent(a.getPackageManager(), it.pkg);
+                if (app != null) app.addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+                return app;
             case LIVE_TV:
-                intent = liveTv(a);
-                break;
+                return liveTv(a);
             case INPUT:
-                intent = new Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(it.inputId));
-                break;
+                return new Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(it.inputId));
             case SETTINGS:
-                intent = new Intent().setComponent(new ComponentName(a, SettingsActivity.class));
-                break;
+                return new Intent().setComponent(new ComponentName(a, SettingsActivity.class));
             case ANDROID_SETTINGS:
-                intent = new Intent(Settings.ACTION_SETTINGS);
-                break;
+                return new Intent(Settings.ACTION_SETTINGS);
+            case SHUFFLE:
+                return null;   // the home screen asks which kind and opens the title
             default:
-                return false;
+                return null;
         }
-        if (intent == null) return false;
+    }
+
+    private static boolean start(Activity a, Intent intent, View from, int x, int y, int w, int h) {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             a.startActivity(intent, ActivityOptions.makeScaleUpAnimation(from, x, y, Math.max(w, 1), Math.max(h, 1)).toBundle());
             return true;
         } catch (ActivityNotFoundException | SecurityException e) {
-            AppLog.w("couldn't open " + it.label + ": " + e.getMessage());
+            AppLog.w("couldn't open " + intent.getPackage() + ": " + e.getMessage());
             return false;
         }
     }

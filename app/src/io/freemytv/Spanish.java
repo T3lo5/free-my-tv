@@ -100,6 +100,7 @@ final class Spanish {
             case "TCL Channel button": return "Botón TCL Channel";
             case "Nothing": return "Nada";
             case "Not installed": return "No instalada";
+            case "Titles on screen": return "Títulos en pantalla";
             case ", selected": return ", seleccionado";
             case "OK or the arrows change the value.": return "OK o las flechas cambian el valor.";
             case "OK picks, Back cancels.": return "OK elige, Atrás cancela.";

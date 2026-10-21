@@ -19,7 +19,9 @@ Open source. Built with Claude Code. One button to undo.
 
 - **No ads.** No sponsored rows, banners or autoplaying promos. Not one.
 - **Your apps, front and center.** The streaming apps you actually use, on a glass shelf. Pick them and their order right on the TV.
-- **Trending, not sponsored.** Three fresh picks every hour from what's trending this week and the latest releases, only from apps you already have. Movies and Shows get their own tabs.
+- **Trending, not sponsored.** Fresh picks every hour from what's trending this week and the latest releases, only from apps you already have. Movies and Shows get their own tabs — and as many titles as you want (three, five or eight).
+- **Today's games.** A *Games* tab with the day's football (Brazil, Europe and the USA), American football and MMA: the time, the crests, the teams and the channel — with the flag of the country it is on.
+- **A surprise.** The *Shuffle* button picks a random movie or series and opens it in Nuvio, on the title.
 - **Weather and markets, one press away.** The hour-by-hour forecast, sunrise and sunset, and live crypto prices.
 - **Light by day, dark by night.** It follows your city's real sunset, the way your phone does.
 - **A screensaver to match.** Full-screen photos of the picks with a big glass clock.
@@ -67,7 +69,13 @@ About ten minutes. You need a Google TV or Android TV (Android 9 or newer) and a
    ```bash
    adb shell "appops set io.freemytv AUTO_START allow || appops set io.freemytv APP_AUTO_START allow"
    ```
-5. **On the TV**, open *Free My TV* → *Home Screen* → *Free My TV*.
+5. **OpenTV, the IPTV player** (it sits on the shelf, third from the left):
+   ```bash
+   tools/install-opentv.sh 192.168.1.50
+   ```
+   The script finds the APK in `apps/OpenTV.apk`, or in a sibling checkout of the OpenTV project (`../opentv/dist`).
+   OpenTV adds your provider on the TV itself: Xtream Codes, an M3U playlist URL or a Stalker portal.
+6. **On the TV**, open *Free My TV* → *Home Screen* → *Free My TV*.
 
 ## Settings
 
@@ -76,6 +84,7 @@ The first values come from `config.properties`, created by the first build. Most
 | Key | What it does | Default |
 |---|---|---|
 | `tmdb_key` | Your free TMDB key, for the picks | empty |
+| `api_football_key` | Your free API-Football key, for the games of the day | empty |
 | `tmdb_region` | Your country (two letters): which titles are on which app | `US` |
 | `latitude`, `longitude` | Your city, for the weather and the sunset | New York |
 | `city` | The name on the weather card | `Weather` |
@@ -90,6 +99,10 @@ Changed something? Run `./build.sh` and install again. Keep `freemytv.keystore`:
 ### The TMDB key
 
 Free, and it takes two minutes: create an account at [themoviedb.org](https://www.themoviedb.org/signup), then open [Settings → API](https://www.themoviedb.org/settings/api) and request a developer key. Paste the *API Read Access Token* (or the *API Key*) after `tmdb_key=`. It's your key: `config.properties` stays out of git.
+
+### The API-Football key
+
+Also free ([api-football.com](https://www.api-football.com/), 100 requests a day): it brings the football of the day — the teams' crests and the league. Without it the *Games* tab still works (the games come from ESPN), but with fewer of them and no crests. Paste the key after `api_football_key=`.
 
 ## Going back
 

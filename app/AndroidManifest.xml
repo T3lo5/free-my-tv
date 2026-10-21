@@ -28,6 +28,11 @@
         <package android:name="com.google.android.tv" />
         <package android:name="com.mediatek.wwtv.tvcenter" />
         <package android:name="com.sony.dtv.tvx" />
+        <!-- The players the picks open in, and the shelf apps that go with them. -->
+        <package android:name="com.nuvio.tv" />
+        <package android:name="com.nuvio.app" />
+        <package android:name="com.world.youcinetv" />
+        <package android:name="app.opentv" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LEANBACK_LAUNCHER" />

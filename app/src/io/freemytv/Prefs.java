@@ -17,6 +17,8 @@ final class Prefs {
     /** Remote keys we handle, with the app each opens until the user picks another. Codes read from the TCL's log. */
     static final int KEY_NETFLIX = 4062, KEY_YOUTUBE = 190, KEY_PRIME = 4099, KEY_TCL_CHANNEL = 4020;
     static final int[] KEYS = {KEY_NETFLIX, KEY_YOUTUBE, KEY_PRIME, KEY_TCL_CHANNEL};
+    /** How many buttons the remote can have (the known ones plus the ones it pressed). */
+    private static final int MAX_CODES = 16;
 
     /** Bumped by every change: screens compare it to know when to redraw. */
     static volatile int version;
@@ -39,6 +41,11 @@ final class Prefs {
 
     private static void put(String key, boolean value) {
         sp().edit().putBoolean(key, value).apply();
+        version++;
+    }
+
+    private static void put(String key, int value) {
+        sp().edit().putInt(key, value).apply();
         version++;
     }
 
@@ -88,6 +95,17 @@ final class Prefs {
 
     // MARK: - Shelf
 
+    /** How many titles the home screen shows in each tab (3, 5 or 8). */
+    static final int[] PICK_COUNTS = {3, 5, 8};
+
+    static int picks() {
+        int v = sp().getInt("picks", 3);
+        for (int count : PICK_COUNTS) if (count == v) return v;
+        return 3;
+    }
+
+    static void setPicks(int value) { put("picks", value); }
+
     /** Packages on the home shelf, in order; null until the user edits it (then the built-in list applies). */
     static List<String> shelf() {
         String v = sp().getString("shelf", null);
@@ -118,4 +136,36 @@ final class Prefs {
     /** Package the key opens ("" = nothing). */
     static String keyApp(int keyCode) { return sp().getString("key" + keyCode, defaultApp(keyCode)); }
     static void setKeyApp(int keyCode, String pkg) { put("key" + keyCode, pkg); }
+
+    /**
+     * The buttons the settings screen shows: the ones we know, then the ones the remote has pressed (the codes
+     * other TVs use). The code is what tells them apart.
+     */
+    static int[] buttonCodes() {
+        List<Integer> codes = new ArrayList<>();
+        for (int code : KEYS) codes.add(code);
+        for (String s : sp().getString("codes", "").split(",")) {
+            int code;
+            try {
+                code = Integer.parseInt(s.trim());
+            } catch (NumberFormatException e) {
+                continue;
+            }
+            if (!codes.contains(code)) codes.add(code);
+        }
+        int[] out = new int[codes.size()];
+        for (int i = 0; i < out.length; i++) out[i] = codes.get(i);
+        return out;
+    }
+
+    /** Remembers a button the remote pressed, so the settings screen can offer it. */
+    static void rememberCode(int keyCode) {
+        List<String> list = new ArrayList<>();
+        for (String s : sp().getString("codes", "").split(",")) if (!s.trim().isEmpty()) list.add(s.trim());
+        String code = String.valueOf(keyCode);
+        if (list.contains(code)) return;
+        list.add(code);
+        while (list.size() > MAX_CODES) list.remove(0);
+        put("codes", String.join(",", list));
+    }
 }

@@ -32,10 +32,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Home screen picks ("This morning / afternoon / tonight"): what's trending this week plus recent releases, only from
- * the streaming apps installed on the TV (Netflix, Prime Video, Disney+, Max, Apple TV, Hulu, Paramount+, Peacock,
- * Globoplay...), via TMDB (an open movie database that knows what streams where in each country). Three per hour.
- * "Watch" opens the service's app.
+ * Home screen picks ("This morning / afternoon / tonight"): what's trending this week plus recent releases, via TMDB
+ * (an open movie database that knows what streams where in each country). Three per hour. "Watch" opens the service's
+ * app when the TV has it (Netflix, Prime Video, Disney+, Max, Apple TV, Hulu, Paramount+, Peacock, Globoplay...) and
+ * Nuvio, already on that title, when it doesn't.
  *
  * Each person uses their own free TMDB key (config.properties "tmdb_key", built into the app). It never goes to the log.
  */
@@ -43,7 +43,7 @@ final class Recs {
     static final class Pick {
         int id;
         String kind;            // "movie" or "tv"
-        String title, backdrop, meta = "", app, pkg;
+        String title, backdrop, meta = "", app, pkg, imdb;
         boolean detailed;
     }
 
@@ -53,11 +53,14 @@ final class Recs {
     private static final String IMAGES = "https://image.tmdb.org/t/p/original";
     private static final long LIST_EVERY = 6 * 3600_000L;
     /** Bump when what is saved for each title changes (the saved list is discarded and fetched again). */
-    private static final int CACHE_VERSION = 3;
+    private static final int CACHE_VERSION = 4;
     private static final int MANHA = 0, TARDE = 1, NOITE = 2;
     static final String[] PERIOD_LABEL = {"PARA ESTA MANHÃ", "PARA ESTA TARDE", "PARA ESTA NOITE"};
     static final String[] PERIOD_LABEL_EN = {"THIS MORNING", "THIS AFTERNOON", "TONIGHT"};
     static final String[] PERIOD_LABEL_ES = {"PARA ESTA MAÑANA", "PARA ESTA TARDE", "PARA ESTA NOCHE"};
+    /** The service key for a pick that opens in Nuvio (SERVICE_NAME's key and HomeApps' shelf key). */
+    static final String NUVIO_KEY = "nuvio";
+
     /** Service name on TMDB (part of the name, lowercase) → TV app (HomeApps key, package). */
     private static final String[][] SERVICES = {
         {"netflix", "netflix", "com.netflix.ninja"},
@@ -81,6 +84,7 @@ final class Recs {
         SERVICE_NAME.put("globoplay", "Globoplay");
         SERVICE_NAME.put("max", "Max");
         SERVICE_NAME.put("appletv", "Apple TV");
+        SERVICE_NAME.put("nuvio", "Nuvio");
     }
     /** Country for "what streams where" (config.properties "tmdb_region", e.g. US, GB, BR). */
     private static final String REGION = Config.TMDB_REGION.trim().toUpperCase(Locale.ROOT);
@@ -107,6 +111,7 @@ final class Recs {
     private volatile boolean light;     // light design: builds only the cards (all three tabs' cards fit in memory)
     private volatile long failedAt, keyStamp;
     private volatile String listLanguage = "";   // language used for the saved titles, genres and texts
+    private String nuvioPkg;                     // the Nuvio build on this TV (looked up once)
 
     private Recs(Context c) {
         context = c;
@@ -171,18 +176,19 @@ final class Recs {
     List<Pick> now(String kind) {
         List<Pick> list = new ArrayList<>();
         if (!hasKey(context)) return list;    // no TMDB key: no recommendations
-        Map<String, Boolean> have = new HashMap<>();   // one look per app, not per title (this runs every 15 s)
         for (Pick p : picks) {
-            if ((kind == null || kind.equals(p.kind))
-                    && (!p.detailed || (p.pkg != null && have.computeIfAbsent(p.pkg, this::installed)))) list.add(p);   // app missing: skip
+            if (kind != null && !kind.equals(p.kind)) continue;
+            if (p.detailed && p.pkg == null) continue;   // no app on the TV to open it
+            list.add(p);
         }
         if (list.isEmpty()) return list;
         long hour = System.currentTimeMillis() / 3600_000L;
-        // Three per hour, never two from the same franchise ("Law & Order" and "Law & Order: Special…").
+        // As many as the person asked for, never two from the same franchise ("Law & Order" and "Law & Order: Special…").
+        int count = Prefs.picks();
         List<Pick> out = new ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
-        for (int i = 0; i < list.size() && out.size() < 3; i++) {
-            Pick p = list.get((int) ((hour * 3 + i) % list.size()));
+        for (int i = 0; i < list.size() && out.size() < count; i++) {
+            Pick p = list.get((int) ((hour * count + i) % list.size()));
             if (seen.add(franchise(p.title))) out.add(p);
         }
         return out;
@@ -199,6 +205,12 @@ final class Recs {
     /** Name of the service the pick is on ("Netflix"), or empty. */
     static String serviceName(Pick p) {
         return p == null || p.app == null ? "" : SERVICE_NAME.get(p.app);
+    }
+
+    /** Nuvio's own deep link for a title: its catalog is keyed by the IMDb id (TMDB's when there is none). */
+    static String nuvioUri(Pick p) {
+        String type = "movie".equals(p.kind) ? "movie" : "series";
+        return "nuvio://meta?type=" + type + (p.imdb != null ? "&id=" + p.imdb : "&tmdb=" + p.id);
     }
 
     /** The pick's ready backdrop (or null: builds it in the background and notifies when it's ready). */
@@ -294,10 +306,8 @@ final class Recs {
         if (!hasKey(context)) return out;
         java.util.Set<String> seen = new java.util.HashSet<>();
         for (Pick p : wanted()) if (hasImage(p) && seen.add(franchise(p.title))) out.add(p);
-        Map<String, Boolean> have = new HashMap<>();
         for (Pick p : picks) {
-            if (p.detailed && p.pkg != null && have.computeIfAbsent(p.pkg, this::installed) && hasImage(p)
-                    && seen.add(franchise(p.title))) out.add(p);
+            if (p.detailed && hasImage(p) && seen.add(franchise(p.title))) out.add(p);
         }
         return out;
     }
@@ -346,6 +356,18 @@ final class Recs {
         });
     }
 
+    /** A title at random, to surprise the person ("movie" or "tv"; null = either). */
+    Pick random(String kind) {
+        List<Pick> list = new ArrayList<>();
+        for (Pick p : picks) {
+            if (kind != null && !kind.equals(p.kind)) continue;
+            if (!p.detailed || p.pkg == null) continue;   // nothing to open it with
+            list.add(p);
+        }
+        if (list.isEmpty()) return null;
+        return list.get((int) (Math.random() * list.size()));
+    }
+
     /** This hour's picks for the three tabs (Explore, Movies, Shows), without repeats. */
     List<Pick> wanted() {
         List<Pick> out = new ArrayList<>();
@@ -368,37 +390,18 @@ final class Recs {
     // MARK: - TMDB
 
     private void fetchList(int p) throws Exception {
-        // The services the TV has, by their TMDB ids in your region.
-        Map<Integer, String[]> services = new HashMap<>();
-        JSONArray providers = get("/watch/providers/movie?language=" + lang() + "&watch_region=" + REGION).getJSONArray("results");
-        for (int i = 0; i < providers.length(); i++) {
-            JSONObject o = providers.getJSONObject(i);
-            String[] s = service(o.optString("provider_name"));
-            if (s != null && installed(s[2])) services.put(o.getInt("provider_id"), s);
-        }
-        if (services.isEmpty()) throw new IOException("none of the TV's streaming services are on TMDB");
-        StringBuilder ids = new StringBuilder();
-        for (int id : services.keySet()) ids.append(ids.length() == 0 ? "" : "|").append(id);
-        String common = "&language=" + lang() + "&watch_region=" + REGION + "&with_watch_monetization_types=flatrate&include_adult=false"
-                + "&sort_by=popularity.desc&with_watch_providers=" + URLEncoder.encode(ids.toString(), "UTF-8");
-        // 1. Trending this week (TMDB goes by what people are watching and searching for right now), only what is
-        //    on one of the TV's services: the details say where (and are then ready).
+        // No filter by installed apps: every title is a candidate, and the details say where to open it (the TV's own
+        // app for that service, or Nuvio). Dropping it also drops a request and the per-title details of the trending
+        // list, which existed only to know whether the TV's apps had the title.
         List<Pick> hotMovies = new ArrayList<>(), hotShows = new ArrayList<>();
         for (String kind : new String[] {"movie", "tv"}) {
             JSONArray hot = get("/trending/" + kind + "/week?language=" + lang()).getJSONArray("results");
-            List<Pick> candidates = new ArrayList<>();
-            for (int i = 0; i < hot.length() && i < 20; i++) add(candidates, hot.getJSONObject(i), kind);
-            for (Pick pick : candidates) {
-                try {
-                    fetchDetails(pick);
-                } catch (Exception e) {
-                    continue;
-                }
-                if (pick.pkg != null) (kind.equals("movie") ? hotMovies : hotShows).add(pick);
+            for (int i = 0; i < hot.length() && i < 20; i++) {
+                add(kind.equals("movie") ? hotMovies : hotShows, hot.getJSONObject(i), kind);
             }
         }
-        // 2. Recent releases on the TV's services: movies from the past year and shows with a new episode in the
-        //    past 3 months.
+        // Recent releases: movies from the past year and shows with a new episode in the past 3 months.
+        String common = "&language=" + lang() + "&sort_by=popularity.desc&include_adult=false";
         JSONArray movies = get("/discover/movie?vote_count.gte=30&primary_release_date.gte=" + day(-365)
                 + "&primary_release_date.lte=" + day(0) + common).getJSONArray("results");
         JSONArray shows = get("/discover/tv?vote_count.gte=20&air_date.gte=" + day(-90) + "&air_date.lte=" + day(0)
@@ -449,12 +452,15 @@ final class Recs {
         list.add(p);
     }
 
-    /** Genre, runtime (or seasons) and the service it's on, among the ones the TV has. */
+    /** Genre, runtime (or seasons) and where it opens: the TV's own app for that service, or Nuvio. */
     private void fetchDetails(Pick p) throws Exception {
         JSONObject o = get("/" + p.kind + "/" + p.id
-                + "?language=" + lang() + "&append_to_response=watch/providers,images&include_image_language=null," + Ui.language + ",en");
+                + "?language=" + lang() + "&append_to_response=watch/providers,images,external_ids&include_image_language=null," + Ui.language + ",en");
         String best = bestBackdrop(o.optJSONObject("images"));
         if (best != null) p.backdrop = best;
+        JSONObject external = o.optJSONObject("external_ids");
+        String imdb = external == null ? "" : external.optString("imdb_id", "");
+        if (!imdb.isEmpty() && !"null".equals(imdb)) p.imdb = imdb;   // what the Nuvio deep link wants
         List<String> parts = new ArrayList<>();
         JSONArray genres = o.optJSONArray("genres");
         if (p.kind.equals("tv")) parts.add(Ui.tr("Série", "Series"));
@@ -479,6 +485,14 @@ final class Recs {
             if (s != null && installed(s[2])) {
                 p.app = s[1];
                 p.pkg = s[2];
+            }
+        }
+        // No app of ours has it (or no service here does): Nuvio, whose catalog is keyed by the same titles, opens it.
+        if (p.app == null) {
+            String nuvio = nuvioPackage();
+            if (!nuvio.isEmpty()) {
+                p.app = NUVIO_KEY;
+                p.pkg = nuvio;
             }
         }
         if (p.app != null) parts.add(SERVICE_NAME.get(p.app));
@@ -537,10 +551,17 @@ final class Recs {
         return HomeApps.launchIntent(context.getPackageManager(), pkg) != null;
     }
 
+    /** The Nuvio build on this TV, or "" (looked up once: it is asked for every title without an app of ours). */
+    private String nuvioPackage() {
+        if (nuvioPkg == null) nuvioPkg = HomeApps.nuvioPackage(context);
+        return nuvioPkg;
+    }
+
     private long sourceStamp() {
         long stamp = Config.TMDB_KEY.hashCode() * 31L + REGION.hashCode();
         for (String[] service : SERVICES) stamp = stamp * 31L + (installed(service[2]) ? service[2].hashCode() : 0);
-        return stamp;
+        String nuvio = nuvioPackage();
+        return stamp * 31L + (nuvio.isEmpty() ? 0 : nuvio.hashCode());
     }
 
     private JSONObject get(String path) throws IOException, org.json.JSONException {
@@ -640,6 +661,7 @@ final class Recs {
             for (Pick p : picks) {
                 a.put(new JSONObject().put("id", p.id).put("kind", p.kind).put("title", p.title).put("backdrop", p.backdrop)
                         .put("meta", p.meta).put("app", p.app == null ? "" : p.app).put("pkg", p.pkg == null ? "" : p.pkg)
+                        .put("imdb", p.imdb == null ? "" : p.imdb)
                         .put("detailed", p.detailed));
             }
             cache.edit().putString("picks", a.toString()).putInt("period", period).putLong("listAt", listAt)
@@ -662,6 +684,7 @@ final class Recs {
             p.meta = o.optString("meta");
             p.app = o.optString("app").isEmpty() ? null : o.optString("app");
             p.pkg = o.optString("pkg").isEmpty() ? null : o.optString("pkg");
+            p.imdb = o.optString("imdb").isEmpty() ? null : o.optString("imdb");
             p.detailed = o.optBoolean("detailed");
             out.add(p);
         }

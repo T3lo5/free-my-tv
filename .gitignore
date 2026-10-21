@@ -9,3 +9,6 @@ out/
 
 # macOS
 .DS_Store
+
+# The old build folder (was owned by another user)
+out.root/
