@@ -51,6 +51,10 @@ final class Prefs {
         sp().edit().putString(key, value).apply();
     }
 
+    private static void putQuiet(String key, long value) {
+        sp().edit().putLong(key, value).apply();
+    }
+
     private static void put(String key, int value) {
         sp().edit().putInt(key, value).apply();
         version++;
@@ -127,6 +131,10 @@ final class Prefs {
         for (String p : packages) sb.append(sb.length() == 0 ? "" : ",").append(p);
         put("shelf", sb.toString());
     }
+
+    /** When the app last asked GitHub for a newer release (once a day is enough). */
+    static long lastUpdateCheck() { return sp().getLong("updateAt", 0); }
+    static void setLastUpdateCheck(long at) { putQuiet("updateAt", at); }
 
     // MARK: - Favourite teams
 

@@ -379,6 +379,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         updatePalette();
         updatePicks();
         restorePickFocus();
+        Updater.maybeUpdate(getContext());   // once a day: a newer release installs itself
         if (sheetOpen) closeSheet();
         sheet.snap(sheet.target);
         motionDirty = true;
