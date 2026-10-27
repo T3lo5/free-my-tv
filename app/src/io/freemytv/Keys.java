@@ -41,7 +41,6 @@ final class Keys {
         if (Prefs.footballKey().isEmpty() && !Config.API_FOOTBALL_KEY.trim().isEmpty()) {
             Prefs.setFootballKey(Config.API_FOOTBALL_KEY.trim());
         }
-        if (!Prefs.tmdbKey().isEmpty()) return;
         for (File file : new File[] {new File(app.getExternalFilesDir(null), FILE),
                 new File("/sdcard/Download/" + FILE)}) {
             if (file.isFile() && importFile(file)) break;
@@ -70,6 +69,13 @@ final class Keys {
                     found = true;
                 } else if (name.equals("api_football_key")) {
                     Prefs.setFootballKey(value);
+                    found = true;
+                } else if (name.equals("city") || name.equals("latitude") || name.equals("longitude")
+                        || name.equals("tmdb_region") || name.equals("currency") || name.equals("temperature")
+                        || name.equals("language")) {
+                    // The same file carries the personal settings, so a release built in CI (which has none) keeps
+                    // the city, the coordinates and the money the TV already showed.
+                    Prefs.importSetting(name.equals("tmdb_region") ? "region" : name, value);
                     found = true;
                 }
             }

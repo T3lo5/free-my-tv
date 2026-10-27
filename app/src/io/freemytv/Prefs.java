@@ -89,9 +89,32 @@ final class Prefs {
 
     // MARK: - City (from config.properties)
 
-    static String city() { return Config.CITY.trim(); }
-    static String latitude() { return Config.LATITUDE; }
-    static String longitude() { return Config.LONGITUDE; }
+    static String city() { return seed("city", Config.CITY).trim(); }
+
+    static String latitude() { return seed("latitude", Config.LATITUDE); }
+
+    static String longitude() { return seed("longitude", Config.LONGITUDE); }
+
+    /** The country whose stores count, for TMDB ("BR", "US"). */
+    static String region() { return seed("region", Config.TMDB_REGION).trim().toUpperCase(Locale.ROOT); }
+
+    /** The money the prices are shown in ("BRL", "USD"). */
+    static String currency() { return seed("currency", Config.CURRENCY).trim().toUpperCase(Locale.ROOT); }
+
+    /** A value read from the keys file (see Keys): kept as-is, under the name the file used. */
+    static void importSetting(String key, String value) { putQuiet(key, value); }
+
+    /**
+     * A setting that came from config.properties on the first run and lives here afterwards: a build made on this
+     * machine seeds it, and a release from CI (which carries no settings) keeps it.
+     */
+    private static String seed(String key, String fallback) {
+        String stored = sp().getString(key, "");
+        if (!stored.isEmpty()) return stored;
+        String value = fallback == null ? "" : fallback.trim();
+        if (!value.isEmpty()) putQuiet(key, value);
+        return value;
+    }
 
     // MARK: - Widgets and coins
 

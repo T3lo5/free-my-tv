@@ -87,7 +87,7 @@ final class Recs {
         SERVICE_NAME.put("nuvio", "Nuvio");
     }
     /** Country for "what streams where" (config.properties "tmdb_region", e.g. US, GB, BR). */
-    private static final String REGION = Config.TMDB_REGION.trim().toUpperCase(Locale.ROOT);
+    private static String region() { return Prefs.region(); }
 
     private static Recs instance;
 
@@ -500,7 +500,7 @@ final class Recs {
             else if (seasons > 0) parts.add(seasons == 1 ? "1 temporada" : seasons + " temporadas");
         }
         JSONObject wp = o.optJSONObject("watch/providers");
-        JSONObject br = wp == null ? null : wp.optJSONObject("results") == null ? null : wp.optJSONObject("results").optJSONObject(REGION);
+        JSONObject br = wp == null ? null : wp.optJSONObject("results") == null ? null : wp.optJSONObject("results").optJSONObject(region());
         JSONArray flat = br == null ? null : br.optJSONArray("flatrate");
         for (int i = 0; flat != null && i < flat.length() && p.app == null; i++) {
             String[] s = service(flat.getJSONObject(i).optString("provider_name"));
@@ -580,7 +580,7 @@ final class Recs {
     }
 
     private long sourceStamp() {
-        long stamp = Keys.tmdb(context).hashCode() * 31L + REGION.hashCode();
+        long stamp = Keys.tmdb(context).hashCode() * 31L + region().hashCode();
         for (String[] service : SERVICES) stamp = stamp * 31L + (installed(service[2]) ? service[2].hashCode() : 0);
         String nuvio = nuvioPackage();
         return stamp * 31L + (nuvio.isEmpty() ? 0 : nuvio.hashCode());

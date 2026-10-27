@@ -635,7 +635,7 @@ public class SettingsActivity extends Activity {
         private static final int COIN_ROWS = 6;
 
         private boolean dollar() {
-            return "BRL".equalsIgnoreCase(Config.CURRENCY.trim());
+            return "BRL".equalsIgnoreCase(Prefs.currency());
         }
 
         private String[] settingLabels() {
