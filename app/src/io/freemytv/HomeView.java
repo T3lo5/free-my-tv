@@ -202,7 +202,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private Spring[] drawerFocus = new Spring[0];
     private RectF[] drawerRects = new RectF[0];
     private final RectF weatherCard = new RectF(), quotesCard = new RectF();
-    private final Spring drawer = new Spring(0.46f, 0.92f, 0);
+    private final Spring drawer = new Spring(0.36f, 0.9f, 0);   // snappier: the TV composes at ~20 ms a frame, so the drawer is better short than slow
     private boolean drawerOpen;
     private int drawerIndex;
 
@@ -631,11 +631,22 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         if (bgFading) sky.invalidate();
         if (bgFading || (drawerWasMoving && !drawerMoving)) platter.invalidate();
         // The drawer's veil: drawn once on its own layer, only its opacity changes while it moves (free for the GPU).
+        // While the drawer is closed it is taken out entirely: a full-screen layer left at opacity 0 is still
+        // composited on every frame of every animation.
         float veilAlpha = tone(0.32f, 0.42f) * Ui.clamp(drawer.value);
-        if (veilAlpha != veilLayer.getAlpha()) veilLayer.setAlpha(veilAlpha);
-        if (veilNight != night) {   // dusk: the veil goes from white to black
-            veilNight = night;
-            veilLayer.invalidate();
+        if (veilAlpha > 0.002f) {
+            if (veilLayer.getVisibility() != VISIBLE) {
+                veilLayer.setVisibility(VISIBLE);
+                veilLayer.invalidate();
+                veilNight = night;   // it is drawn again just now, with the current colour
+            }
+            if (veilAlpha != veilLayer.getAlpha()) veilLayer.setAlpha(veilAlpha);
+            if (veilNight != night) {   // dusk: the veil goes from white to black
+                veilNight = night;
+                veilLayer.invalidate();
+            }
+        } else if (veilLayer.getVisibility() != INVISIBLE) {
+            veilLayer.setVisibility(INVISIBLE);
         }
         drawerWasMoving = drawerMoving;
         tilesDirty = statusDirty = heroDirty = drawerDirty = gridDirty = motionDirty = false;

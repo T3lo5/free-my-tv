@@ -85,11 +85,17 @@ Baseado na pesquisa dos agentes (foco em "continuar assistindo" e atalhos reais,
 
 ## 4) Performance (manter 60fps sem animações pesadas)
 
-> **Status (27/10):** o véu do drawer virou uma camada própria (um retângulo desenhado uma vez; por frame só muda a
-> opacidade) e o céu não é mais redesenhado a cada frame do drawer. Medido na TV (TCL G13, 1080p60, `gfxinfo`):
-> drawer p50 **34 → 28 ms** (p90 42 → 34), foco na fileira 18 ms, folha "Todos os Apps" 20 ms, e parado o app não
-> desenha nenhum frame. O que sobra no drawer é fill-rate da GPU (cinco camadas de tela cheia com alpha); baixar mais
-> pede outro desenho (animar um snapshot único), não micro-otimização.
+> **Status (27/10, medido na TV):** o véu do drawer virou camada própria (retângulo desenhado uma vez; por frame só
+> muda a opacidade) e o céu não é mais redesenhado a cada frame do drawer: drawer p50 **34 → 28 ms** (p90 42 → 34).
+>
+> **O teto deste painel (TCL G13, 1080p60):** com as quatro camadas do home escondidas o frame continua em ~24 ms, com
+> elas paradas em ~26 ms, e a animação mais leve de todas (foco na fileira) fica em ~18 ms. Ou seja, a janela custa
+> ~18–20 ms por frame animado **independentemente do que o app desenha**: 60 fps não é alcançável nesta TV. A ideia de
+> "animar um retrato único" foi descartada depois de medida — esconder quatro camadas economiza só 2–4 ms.
+>
+> **Decisão:** em vez de perseguir fps, encurtar a animação. O drawer passou de `response` 0,46 s para 0,36 s (mesma
+> curva, damping 0,9): ~20% menos tempo por transição (37 → 30 frames), mesma aparência. E o véu agora fica `INVISIBLE`
+> com o drawer fechado, em vez de compor uma camada de tela cheia com opacidade 0 em todo frame de toda animação.
 
 Melhorias concretas e de baixo risco para GPUs fracas (Mi Box 3/Mali):
 
