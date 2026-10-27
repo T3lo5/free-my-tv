@@ -31,29 +31,50 @@ final class Updater {
 
     private Updater() {}
 
-    /**
-     * Checks (at most once a day) and installs, in the background. The install runs detached: it replaces this very
-     * process, so the command has to outlive us.
-     */
+    /** Where the check is, for the settings screen ("Procurando…", "Já está atualizado"). */
+    interface Status { void on(String message); }
+
+    /** Once a day, when the home comes back: the quiet path. */
     static void maybeUpdate(Context c) {
+        check(c, false, null);
+    }
+
+    /**
+     * Checks (at most once a day unless `force`) and installs, in the background. The install runs detached: it
+     * replaces this very process, so the command has to outlive us.
+     */
+    static void check(Context c, boolean force, Status status) {
         final Context app = c.getApplicationContext();
-        if (System.currentTimeMillis() - Prefs.lastUpdateCheck() < EVERY) return;
+        if (!force && System.currentTimeMillis() - Prefs.lastUpdateCheck() < EVERY) return;
         Prefs.setLastUpdateCheck(System.currentTimeMillis());
         new Thread(() -> {
             try {
+                report(status, "Procurando…");
                 Release release = latest();
-                if (release == null || !release.newerThan(installedVersion(app))) return;
+                if (release == null || !release.newerThan(installedVersion(app))) {
+                    report(status, "Já está atualizado (" + installedVersion(app) + ").");
+                    return;
+                }
+                report(status, "Baixando " + release.tag + "…");
                 File apk = download(app, release);
                 String problem = signatureProblem(app, apk);
                 if (problem != null) {
                     AppLog.w("update " + release.tag + " refused: " + problem);
+                    report(status, "Recusado: " + problem);
                     return;
                 }
+                report(status, "Instalando " + release.tag + "…");
                 install(app, apk);
             } catch (Exception e) {
                 AppLog.w("update: " + e.getMessage());
+                report(status, "Não deu: " + e.getMessage());
             }
         }, "update").start();
+    }
+
+    private static void report(Status status, String message) {
+        AppLog.w("update: " + message);
+        if (status != null) new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> status.on(message));
     }
 
     private static final class Release {

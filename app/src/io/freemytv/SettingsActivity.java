@@ -129,6 +129,7 @@ public class SettingsActivity extends Activity {
         private final List<String> shelfOrder = new ArrayList<>();
         private final List<String> favoriteTeams = new ArrayList<>();   // the favourites screen: the teams of today's games
         private Games.Listener favoritesListener;                       // refills the list when the games arrive
+        private String updateStatus = "";                               // "Procurar atualização": where it is
         private int pickFor, pickCurrent, pickScroll;   // pickFor: the remote button (index + 1)
         private int keyScroll;                          // the remote buttons list: the first row shown
         private final RectF tmp = new RectF(), rowRect = new RectF(), focusBox = new RectF();
@@ -209,7 +210,8 @@ public class SettingsActivity extends Activity {
                     }
                     String[] names = {Ui.tr("Tela de Descanso, ver agora", "Screensaver, preview"), Ui.tr("Ajustes do Início", "Home Settings"),
                             Ui.tr("Prateleira", "Shelf"), Ui.tr("Times favoritos", "Favourite teams"),
-                            Ui.tr("Botões do Controle", "Remote Buttons"), Ui.tr("Ajustes da TV", "TV Settings")};
+                            Ui.tr("Botões do Controle", "Remote Buttons"), Ui.tr("Ajustes da TV", "TV Settings"),
+                            Ui.tr("Procurar atualização", "Check for updates")};
                     return row - 1 < names.length ? names[row - 1] : "";
                 }
                 case HOME_CHOICE: {
@@ -333,7 +335,7 @@ public class SettingsActivity extends Activity {
 
         private int rowCount() {
             switch (screen) {
-                case MAIN: return 7;
+                case MAIN: return 8;
                 case HOME_CHOICE: return 2;
                 case HOME_SETTINGS: return settingLabels().length;
                 case PICKER: return Math.min(PICK_VISIBLE, pickLabels.size());
@@ -378,9 +380,9 @@ public class SettingsActivity extends Activity {
             String[] labels = {Ui.tr("Início", "Home Screen"), Ui.tr("Tela de Descanso", "Screensaver"),
                     Ui.tr("Ajustes do Início", "Home Settings"), Ui.tr("Prateleira", "Shelf"),
                     Ui.tr("Times favoritos", "Favourite teams"), Ui.tr("Botões do Controle", "Remote Buttons"),
-                    Ui.tr("Ajustes da TV", "TV Settings")};
-            String[] values = {working ? "" : mode, Ui.tr("Ver agora", "Preview"), "", "", "", "", ""};
-            for (int i = 0; i < 7; i++) {
+                    Ui.tr("Ajustes da TV", "TV Settings"), Ui.tr("Procurar atualização", "Check for updates")};
+            String[] values = {working ? "" : mode, Ui.tr("Ver agora", "Preview"), "", "", "", "", "", updateStatus};
+            for (int i = 0; i < 8; i++) {
                 float y = (LIST_TOP + i * (ROW_H + ROW_GAP)) * k;
                 rowRect.set(LIST_X * k, y, LIST_R * k, y + ROW_H * k);
                 float f = drawRowBackground(c, i);
@@ -389,7 +391,7 @@ public class SettingsActivity extends Activity {
                 float base = rowRect.centerY() + Ui.halfCap(rowLabel);
                 c.drawText(labels[i], rowRect.left + 30 * k, base, rowLabel);
                 float right = rowRect.right - 30 * k;
-                if (i >= 2) {
+                if (i >= 2 && i != 7) {
                     float cw = Symbols.width(getContext(), "chevron_right", 22 * k);
                     Symbols.draw(getContext(), c, "chevron_right", right - cw / 2, rowRect.centerY(), 22 * k, blend(0x66FFFFFF, 0x991C1C1E, f));
                 } else if (i == 0 && working) {
@@ -407,7 +409,7 @@ public class SettingsActivity extends Activity {
                 }
             }
 
-            float y = (LIST_TOP + 7 * (ROW_H + ROW_GAP) + 20) * k;
+            float y = (LIST_TOP + 8 * (ROW_H + ROW_GAP) + 20) * k;
             String error = state.optString("error");
             if (working && (busyText.contains("Permitir") || busyText.contains("Allow"))) {
                 c.drawText(Ui.tr("Na TV: marque “Sempre permitir” e aperte OK.", "On the TV: tick “Always allow” and press OK."),
@@ -1058,8 +1060,15 @@ public class SettingsActivity extends Activity {
                 screen = REMOTE_KEYS;
                 focus = 0;
                 pickScroll = 0;
-            } else {
+            } else if (focus == 6) {
                 activity.startActivity(new Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            } else {
+                updateStatus = Ui.tr("Procurando…", "Checking…");
+                Updater.check(c, true, message -> {
+                    updateStatus = message;
+                    invalidate();
+                });
+                return;
             }
             for (Spring s : pop) s.snap(0);
             invalidate();
