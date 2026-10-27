@@ -28,41 +28,11 @@ jobs:
           yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
           "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0" >/dev/null
 
-      # The APK carries the settings from config.properties, the TMDB key included: a build without
-      # them would replace a working install with one that has no picks and no screensaver photos.
-      - name: Settings from the repository secrets
-        env:
-          TMDB_KEY: ${{ secrets.TMDB_KEY }}
-          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
-          TMDB_REGION: ${{ secrets.TMDB_REGION }}
-          LATITUDE: ${{ secrets.LATITUDE }}
-          LONGITUDE: ${{ secrets.LONGITUDE }}
-          CITY: ${{ secrets.CITY }}
-          CURRENCY: ${{ secrets.CURRENCY }}
-          TEMPERATURE: ${{ secrets.TEMPERATURE }}
-          LANGUAGE: ${{ secrets.LANGUAGE }}
-        run: |
-          set -euo pipefail
-          if [ -z "${TMDB_KEY:-}" ]; then
-            echo "::error::No TMDB_KEY secret. Without it the APK ships without the picks; add the secrets listed in docs or README before releasing."
-            exit 1
-          fi
-          cp config.example.properties config.properties
-          set_value() {
-            local key="$1" value="$2"
-            if [ -n "$value" ]; then
-              sed -i "s|^${key}=.*|${key}=${value}|" config.properties
-            fi
-          }
-          set_value tmdb_key "$TMDB_KEY"
-          set_value api_football_key "${API_FOOTBALL_KEY:-}"
-          set_value tmdb_region "${TMDB_REGION:-BR}"
-          set_value latitude "${LATITUDE:-}"
-          set_value longitude "${LONGITUDE:-}"
-          set_value city "${CITY:-}"
-          set_value currency "${CURRENCY:-BRL}"
-          set_value temperature "${TEMPERATURE:-C}"
-          set_value language "${LANGUAGE:-auto}"
+      # No keys here, on purpose: this repository is public, so a release APK is public, and anything baked into it
+      # can be read out of the file. The TMDB and API-Football keys live in config.properties on the machine that
+      # builds for the TV, and in the app's own settings on the TV. A release built here is the code, nothing personal.
+      - name: Settings (no keys)
+        run: cp config.example.properties config.properties
 
       # Same key as every install out there: an update signed with anything else is rejected by
       # Android (INSTALL_FAILED_UPDATE_INCOMPATIBLE), and the person would have to reinstall.

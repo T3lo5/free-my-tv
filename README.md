@@ -101,6 +101,11 @@ The first values come from `config.properties`, created by the first build. Most
 
 Changed something? Run `./build.sh` and install again. Keep `freemytv.keystore`: updates are signed with it.
 
+**Your keys stay on your machine.** `config.properties` holds your TMDB and API-Football keys, and the APK built from
+it carries them — so the releases published by CI are built **without** keys and are only the code. That also means a
+release from CI is not a drop-in replacement for the APK on a TV that has your keys baked in: the picks would stop
+until the keys are provided again.
+
 ### The TMDB key
 
 Free, and it takes two minutes: create an account at [themoviedb.org](https://www.themoviedb.org/signup), then open [Settings → API](https://www.themoviedb.org/settings/api) and request a developer key. Paste the *API Read Access Token* (or the *API Key*) after `tmdb_key=`. It's your key: `config.properties` stays out of git.
