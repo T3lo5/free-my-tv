@@ -4,8 +4,10 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Settings changed on the TV itself (Free My TV > Settings). config.properties only gives the first
@@ -124,6 +126,30 @@ final class Prefs {
         StringBuilder sb = new StringBuilder();
         for (String p : packages) sb.append(sb.length() == 0 ? "" : ",").append(p);
         put("shelf", sb.toString());
+    }
+
+    // MARK: - Favourite teams
+
+    /** The teams the person follows, by key ("flamengo"): their games come first on the home screen. */
+    static Set<String> favorites() {
+        Set<String> out = new HashSet<>();
+        for (String key : sp().getString("favorites", "").split("\n")) if (!key.isEmpty()) out.add(key);
+        return out;
+    }
+
+    static void setFavorites(Set<String> teams) {
+        StringBuilder sb = new StringBuilder();
+        for (String key : teams) sb.append(sb.length() == 0 ? "" : "\n").append(key);
+        put("favorites", sb.toString());
+    }
+
+    /** A team's name as it is kept: trimmed and lowercase ("Flamengo" -> "flamengo"). */
+    static String teamKey(String team) {
+        return team == null ? "" : team.trim().toLowerCase(Locale.ROOT);
+    }
+
+    static boolean isFavorite(String team) {
+        return favorites().contains(teamKey(team));
     }
 
     // MARK: - Continue / last focus

@@ -78,14 +78,21 @@ final class Games {
      */
     private static final String[][] LEAGUES = {
         {"201", "Brazil Serie A", "soccer/bra.1", "br", "Premiere, SporTV ou Globo"},
+        {"72", "Brazil Serie B", "soccer/bra.2", "br", "Premiere ou SporTV"},
+        {"73", "Copa do Brasil", "", "br", "Globo, SporTV ou Premiere"},
         {"39", "Premier League", "soccer/eng.1", "gb", ""},
         {"140", "La Liga", "soccer/esp.1", "es", ""},
         {"78", "Bundesliga", "soccer/ger.1", "de", ""},
         {"135", "Serie A", "soccer/ita.1", "it", ""},
         {"61", "Ligue 1", "soccer/fra.1", "fr", ""},
+        {"94", "Primeira Liga", "soccer/por.1", "pt", ""},
+        {"88", "Eredivisie", "soccer/ned.1", "nl", ""},
+        {"40", "Championship", "soccer/eng.2", "gb", ""},
         {"2", "UEFA Champions League", "soccer/uefa.champions", "eu", ""},
+        {"848", "UEFA Conference League", "soccer/uefa.europa.conf", "eu", ""},
         {"3", "UEFA Europa League", "soccer/uefa.europa", "eu", ""},
         {"13", "CONMEBOL Libertadores", "", "eu", ""},
+        {"11", "CONMEBOL Sudamericana", "soccer/conmebol.sudamericana", "eu", ""},
         {"253", "Major League Soccer", "soccer/usa.1", "us", ""},
         {"0", "", "football/nfl", "us", ""},
         {"0", "", "football/college-football", "us", ""},
@@ -96,7 +103,7 @@ final class Games {
     /** How often the list is asked for again. */
     private static final long FRESH = 3 * 3600_000L;
     /** Bumped when what is saved changes (the old file is thrown away). */
-    private static final int VERSION = 5;   // 5: the channel's country is the broadcaster's, not the league's
+    private static final int VERSION = 6;   // 6: more competitions, and the channel's own country   // 5: the channel's country is the broadcaster's, not the league's
     /** Where the little flags come from (40 px wide, a few kB each). */
     private static final String FLAGS = "https://flagcdn.com/w40/";
 
@@ -128,6 +135,19 @@ final class Games {
         synchronized (games) {
             return new ArrayList<>(games);
         }
+    }
+
+    /** Every team in the list being shown, by name: what the favourites screen offers. */
+    static List<String> teams(Context c) {
+        List<String> out = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (Game g : get(c).today()) {
+            for (String team : new String[] {g.home, g.away}) {
+                if (!team.isEmpty() && seen.add(team)) out.add(team);
+            }
+        }
+        Collections.sort(out, String.CASE_INSENSITIVE_ORDER);
+        return out;
     }
 
     /** Asks for the list when it is old (or from another day). */
@@ -180,6 +200,7 @@ final class Games {
         try {
             for (String[] league : LEAGUES) {
                 final String[] row = league;
+                if (row[2].isEmpty()) continue;   // ESPN has no path for it: the games come from API-Football only
                 pool.execute(() -> {
                     List<Game> games = new ArrayList<>();
                     for (String day : dates) {
@@ -207,7 +228,7 @@ final class Games {
         // whole round, so the game itself does not have to be the same one).
         for (Game g : football) {
             String[] row = leagueOf(g);
-            if (row == null) continue;
+            if (row == null || row[2].isEmpty()) continue;   // no ESPN path (Copa do Brasil, Libertadores)
             Game match = closest(g, espn.get(row[2]));
             if (match == null) continue;
             if (!match.channel.isEmpty()) {
@@ -223,6 +244,18 @@ final class Games {
         all.addAll(espnOnly);
         all.removeIf(g -> g.at < from || g.at >= to);
         Collections.sort(all, Comparator.comparingLong(g -> g.at));
+        // The teams the person follows go first; the rest of the day stays below, in time order.
+        Set<String> favourites = Prefs.favorites();
+        if (!favourites.isEmpty()) {
+            List<Game> followed = new ArrayList<>(), rest = new ArrayList<>();
+            for (Game g : all) {
+                if (favourites.contains(Prefs.teamKey(g.home)) || favourites.contains(Prefs.teamKey(g.away))) followed.add(g);
+                else rest.add(g);
+            }
+            all.clear();
+            all.addAll(followed);
+            all.addAll(rest);
+        }
         synchronized (games) {
             games.clear();
             games.addAll(all);

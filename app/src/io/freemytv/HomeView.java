@@ -1754,7 +1754,9 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         gameChannelText.clear();
         TextPaint match = new TextPaint(lGame), channel = new TextPaint(lGameChannel);
         for (Games.Game g : gameList) {
-            gameMatchText.add(TextUtils.ellipsize(g.match(), match, 980 * k, TextUtils.TruncateAt.END).toString());
+            boolean favourite = Prefs.isFavorite(g.home) || Prefs.isFavorite(g.away);
+            String name = favourite ? "\u2605 " + g.match() : g.match();
+            gameMatchText.add(TextUtils.ellipsize(name, match, 980 * k, TextUtils.TruncateAt.END).toString());
             String where = g.channel.isEmpty() ? (g.venue.isEmpty() ? "" : g.venue) : g.channel;
             gameChannelText.add(TextUtils.ellipsize(where, channel, 430 * k, TextUtils.TruncateAt.END).toString());
         }

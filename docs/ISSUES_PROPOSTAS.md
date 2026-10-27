@@ -185,6 +185,16 @@ dia (jogos, clima) fora da home.
   nova, cai no aviso de sempre — testado na TV com o 0.12.6 instalado.
 - Os nomes vão como candidatos ("Premiere|SporTV|Globo"); "Paramount+" (streaming, não canal) não casa e cai na lista.
 
+### Feito (27/10, na TV)
+
+- **Times favoritos** (Ajustes → *Times favoritos*): a lista dos times dos jogos do dia, OK marca/desmarca; os jogos
+  desses times sobem para o topo e ganham um ★ na linha. Fica em `Prefs.favorites()`, comparado pelo nome em minúsculas.
+- **Mais competições**: Série B, Copa do Brasil, Sul-Americana, Conference League, Primeira Liga, Eredivisie e
+  Championship (ids conferidos na API-Football; caminhos do ESPN conferidos um a um). Série B, Copa do Brasil e Série A
+  trazem a emissora brasileira na tabela; as europeias ficam sem palpite (direitos mudam de ano em ano e chutar é pior
+  que não dizer nada).
+- O log de `HTTP 404` do ESPN acabou: competição sem caminho no ESPN (Copa do Brasil, Libertadores) não é mais pedida.
+
 ### Ordem sugerida
 
 1. **Trailer**, **"onde assistir"** e **apps recentes** — os três são pequenos, aparecem na hora e não mudam o desenho.

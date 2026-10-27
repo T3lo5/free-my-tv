@@ -110,7 +110,8 @@ public class SettingsActivity extends Activity {
     }
 
     static final class SettingsView extends View implements Choreographer.FrameCallback {
-        private static final int MAIN = 0, HOME_CHOICE = 1, HOME_SETTINGS = 2, REMOTE_KEYS = 3, PICKER = 4, SHELF_EDIT = 5;
+        private static final int MAIN = 0, HOME_CHOICE = 1, HOME_SETTINGS = 2, REMOTE_KEYS = 3, PICKER = 4, SHELF_EDIT = 5,
+                FAVORITES = 6;
         private static final float LIST_ROW_H = 68, LIST_ROW_GAP = 6;
         private static final int PICK_VISIBLE = 9;
         private static final float LIST_X = 1000, LIST_R = 1824, LIST_TOP = 186, ROW_H = 74, ROW_GAP = 8, CHOICE_H = 104;
@@ -126,6 +127,8 @@ public class SettingsActivity extends Activity {
         // The shelf editor: the apps it can hold (selected ones first, in order) and the selection.
         private final List<String[]> shelfRows = new ArrayList<>();
         private final List<String> shelfOrder = new ArrayList<>();
+        private final List<String> favoriteTeams = new ArrayList<>();   // the favourites screen: the teams of today's games
+        private Games.Listener favoritesListener;                       // refills the list when the games arrive
         private int pickFor, pickCurrent, pickScroll;   // pickFor: the remote button (index + 1)
         private int keyScroll;                          // the remote buttons list: the first row shown
         private final RectF tmp = new RectF(), rowRect = new RectF(), focusBox = new RectF();
@@ -205,7 +208,8 @@ public class SettingsActivity extends Activity {
                         return Ui.tr("Início, ", "Home Screen, ") + value;
                     }
                     String[] names = {Ui.tr("Tela de Descanso, ver agora", "Screensaver, preview"), Ui.tr("Ajustes do Início", "Home Settings"),
-                            Ui.tr("Prateleira", "Shelf"), Ui.tr("Botões do Controle", "Remote Buttons"), Ui.tr("Ajustes da TV", "TV Settings")};
+                            Ui.tr("Prateleira", "Shelf"), Ui.tr("Times favoritos", "Favourite teams"),
+                            Ui.tr("Botões do Controle", "Remote Buttons"), Ui.tr("Ajustes da TV", "TV Settings")};
                     return row - 1 < names.length ? names[row - 1] : "";
                 }
                 case HOME_CHOICE: {
@@ -226,6 +230,13 @@ public class SettingsActivity extends Activity {
                     if (at >= pickLabels.size()) return "";
                     return pickLabels.get(at) + (at == pickCurrent ? Ui.tr(", escolhido", ", selected") : "")
                             + ", " + (at + 1) + Ui.tr(" de ", " of ") + pickLabels.size();
+                }
+                case FAVORITES: {
+                    int at = pickScroll + row;
+                    if (at >= favoriteTeams.size()) return "";
+                    String team = favoriteTeams.get(at);
+                    return team + (Prefs.isFavorite(team) ? Ui.tr(", favorito", ", favourite") : "") + ", "
+                            + (at + 1) + Ui.tr(" de ", " of ") + favoriteTeams.size();
                 }
                 case SHELF_EDIT: {
                     int at = pickScroll + row;
@@ -322,11 +333,12 @@ public class SettingsActivity extends Activity {
 
         private int rowCount() {
             switch (screen) {
-                case MAIN: return 6;
+                case MAIN: return 7;
                 case HOME_CHOICE: return 2;
                 case HOME_SETTINGS: return settingLabels().length;
                 case PICKER: return Math.min(PICK_VISIBLE, pickLabels.size());
                 case SHELF_EDIT: return Math.min(PICK_VISIBLE, shelfRows.size());
+                case FAVORITES: return Math.min(PICK_VISIBLE, favoriteTeams.size());
                 case REMOTE_KEYS: return Math.min(PICK_VISIBLE, Prefs.buttonCodes().length);
                 default: return Prefs.buttonCodes().length;
             }
@@ -356,7 +368,7 @@ public class SettingsActivity extends Activity {
             c.drawText(Ui.tr("Início e tela de descanso da TV", "Your TV's home screen and screensaver"), cx, 660 * k, subtitle);
             c.drawText(versionName(getContext()), cx, 704 * k, version);
 
-            if (screen == MAIN) drawMain(c, seconds); else if (screen == HOME_CHOICE) drawChoice(c); else if (screen == PICKER) drawPicker(c); else if (screen == SHELF_EDIT) drawShelfEditor(c); else drawList(c);
+            if (screen == MAIN) drawMain(c, seconds); else if (screen == HOME_CHOICE) drawChoice(c); else if (screen == PICKER) drawPicker(c); else if (screen == SHELF_EDIT) drawShelfEditor(c); else if (screen == FAVORITES) drawFavorites(c); else drawList(c);
         }
 
         private void drawMain(Canvas c, float seconds) {
@@ -365,9 +377,10 @@ public class SettingsActivity extends Activity {
             String mode = freeActive() ? "Free My TV" : Ui.tr("Original", "Original");
             String[] labels = {Ui.tr("Início", "Home Screen"), Ui.tr("Tela de Descanso", "Screensaver"),
                     Ui.tr("Ajustes do Início", "Home Settings"), Ui.tr("Prateleira", "Shelf"),
-                    Ui.tr("Botões do Controle", "Remote Buttons"), Ui.tr("Ajustes da TV", "TV Settings")};
-            String[] values = {working ? "" : mode, Ui.tr("Ver agora", "Preview"), "", "", "", ""};
-            for (int i = 0; i < 6; i++) {
+                    Ui.tr("Times favoritos", "Favourite teams"), Ui.tr("Botões do Controle", "Remote Buttons"),
+                    Ui.tr("Ajustes da TV", "TV Settings")};
+            String[] values = {working ? "" : mode, Ui.tr("Ver agora", "Preview"), "", "", "", "", ""};
+            for (int i = 0; i < 7; i++) {
                 float y = (LIST_TOP + i * (ROW_H + ROW_GAP)) * k;
                 rowRect.set(LIST_X * k, y, LIST_R * k, y + ROW_H * k);
                 float f = drawRowBackground(c, i);
@@ -394,7 +407,7 @@ public class SettingsActivity extends Activity {
                 }
             }
 
-            float y = (LIST_TOP + 6 * (ROW_H + ROW_GAP) + 20) * k;
+            float y = (LIST_TOP + 7 * (ROW_H + ROW_GAP) + 20) * k;
             String error = state.optString("error");
             if (working && (busyText.contains("Permitir") || busyText.contains("Allow"))) {
                 c.drawText(Ui.tr("Na TV: marque “Sempre permitir” e aperte OK.", "On the TV: tick “Always allow” and press OK."),
@@ -597,7 +610,9 @@ public class SettingsActivity extends Activity {
                                 focus = pickFor - 1 - keyScroll;
                                 screen = REMOTE_KEYS;
                             } else {
-                                focus = screen == HOME_SETTINGS ? 2 : screen == SHELF_EDIT ? 3 : screen == REMOTE_KEYS ? 4 : 0;
+                                if (screen == FAVORITES) closeFavorites();
+                                focus = screen == HOME_SETTINGS ? 2 : screen == SHELF_EDIT ? 3 : screen == FAVORITES ? 4
+                                        : screen == REMOTE_KEYS ? 5 : 0;
                                 screen = MAIN;
                             }
                         }
@@ -750,7 +765,7 @@ public class SettingsActivity extends Activity {
         }
 
         private boolean scrolling() {
-            return screen == PICKER || screen == SHELF_EDIT || screen == REMOTE_KEYS;
+            return screen == PICKER || screen == SHELF_EDIT || screen == REMOTE_KEYS || screen == FAVORITES;
         }
 
         /** The list of the screen: the remote buttons have their own scroll (the picker would lose it). */
@@ -762,6 +777,7 @@ public class SettingsActivity extends Activity {
 
         private int listSize() {
             if (screen == SHELF_EDIT) return shelfRows.size();
+            if (screen == FAVORITES) return favoriteTeams.size();
             if (screen == REMOTE_KEYS) return Prefs.buttonCodes().length;
             return pickLabels.size();
         }
@@ -841,6 +857,81 @@ public class SettingsActivity extends Activity {
             c.drawText(Ui.tr("OK põe ou tira da prateleira (até " + HomeApps.MAX_SHELF + "). ← → mudam a ordem.",
                     "OK adds or removes (up to " + HomeApps.MAX_SHELF + "). ← → change the order.",
                     "OK pone o quita del estante (hasta " + HomeApps.MAX_SHELF + "). ← → cambian el orden."), LIST_X * k + 30 * k, hy, hint);
+        }
+
+        // MARK: - Favourite teams
+
+        /** The teams of today's games, each one on or off. */
+        private void openFavorites() {
+            Games games = Games.get(getContext());
+            favoritesListener = new Games.Listener() {
+                @Override public void onGames() {
+                    if (screen == FAVORITES) reloadFavorites();
+                }
+            };
+            games.addListener(favoritesListener);
+            games.refreshIfStale();   // another process may not have fetched today's games yet
+            pickScroll = 0;
+            focus = 0;
+            screen = FAVORITES;
+            reloadFavorites();
+        }
+
+        private void reloadFavorites() {
+            favoriteTeams.clear();
+            favoriteTeams.addAll(Games.teams(getContext()));
+            if (focus >= rowCount()) focus = Math.max(0, rowCount() - 1);
+            invalidate();
+        }
+
+        private void closeFavorites() {
+            if (favoritesListener != null) {
+                Games.get(getContext()).removeListener(favoritesListener);
+                favoritesListener = null;
+            }
+        }
+
+        /** OK: follows or stops following the team under the focus (and its games move to the top). */
+        private void toggleFavorite() {
+            int at = pickScroll + focus;
+            if (at >= favoriteTeams.size()) return;
+            String key = Prefs.teamKey(favoriteTeams.get(at));
+            Set<String> favorites = Prefs.favorites();
+            if (!favorites.remove(key)) favorites.add(key);
+            Prefs.setFavorites(favorites);
+            invalidate();
+        }
+
+        private void drawFavorites(Canvas c) {
+            Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
+            c.drawText(Ui.tr("Times favoritos", "Favourite teams"), LIST_X * k + 30 * k, (LIST_TOP - 24) * k, heading);
+            if (favoriteTeams.isEmpty()) {
+                Paint empty = Ui.text(Ui.regular, 26 * k, 0x8CFFFFFF);
+                c.drawText(Ui.tr("Nenhum jogo na lista ainda. Os times aparecem aqui quando houver jogos.",
+                        "No games in the list yet. The teams show up here once there are games.",
+                        "Todavía no hay partidos. Los equipos aparecen aquí cuando los haya."),
+                        LIST_X * k + 30 * k, (LIST_TOP + 60) * k, empty);
+                return;
+            }
+            int rows = rowCount();
+            for (int i = 0; i < rows; i++) {
+                String team = favoriteTeams.get(pickScroll + i);
+                boolean on = Prefs.isFavorite(team);
+                float y = (LIST_TOP + 20 + i * (LIST_ROW_H + LIST_ROW_GAP)) * k;
+                rowRect.set(LIST_X * k, y, LIST_R * k, y + LIST_ROW_H * k);
+                float f = drawRowBackground(c, i);
+                rowLabel.setColor(blend(on ? 0xF2FFFFFF : 0x80FFFFFF, on ? INK : 0x801C1C1E, f));
+                rowValue.setColor(blend(on ? 0xFFFFFFFF : 0x66FFFFFF, on ? INK : 0x661C1C1E, f));
+                float base = rowRect.centerY() + Ui.halfCap(rowLabel);
+                c.drawText(TextUtils.ellipsize(team, new TextPaint(rowLabel), 520 * k, TextUtils.TruncateAt.END).toString(),
+                        rowRect.left + 30 * k, base, rowLabel);
+                c.drawText(on ? "\u2605" : "", rowRect.right - 30 * k, base, rowValue);
+            }
+            Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
+            float hy = (LIST_TOP + 20 + rows * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
+            c.drawText(Ui.tr("OK marca ou desmarca. Os jogos desses times sobem para o topo.",
+                    "OK marks or unmarks. Their games move to the top.",
+                    "OK marca o desmarca. Sus partidos suben al principio."), LIST_X * k + 30 * k, hy, hint);
         }
 
         private void openPicker(int which) {
@@ -934,6 +1025,9 @@ public class SettingsActivity extends Activity {
                 Prefs.setKeyApp(codes[pickFor - 1], appPkgs.get(at));
                 focus = pickFor - 1 - keyScroll;
                 screen = REMOTE_KEYS;
+            } else if (screen == FAVORITES) {
+                toggleFavorite();
+                return;
             } else if (screen == SHELF_EDIT) {
                 toggleShelfApp();
                 invalidate();
@@ -957,6 +1051,8 @@ public class SettingsActivity extends Activity {
             } else if (focus == 3) {
                 openShelfEditor();
             } else if (focus == 4) {
+                openFavorites();
+            } else if (focus == 5) {
                 HomeMode.ensureRemoteService(c, 0);   // the buttons work from inside other apps through this service
                 loadApps();
                 screen = REMOTE_KEYS;
