@@ -44,6 +44,11 @@ final class Prefs {
         version++;
     }
 
+    /** Writes without a settings change: for what the home screen remembers for itself (the last title opened). */
+    private static void putQuiet(String key, String value) {
+        sp().edit().putString(key, value).apply();
+    }
+
     private static void put(String key, int value) {
         sp().edit().putInt(key, value).apply();
         version++;
@@ -120,6 +125,16 @@ final class Prefs {
         for (String p : packages) sb.append(sb.length() == 0 ? "" : ",").append(p);
         put("shelf", sb.toString());
     }
+
+    // MARK: - Continue / last focus
+
+    /** The last Nuvio deeplink opened (a pick's title), to offer "Continuar" in the drawer. */
+    static String lastDeeplink() { return sp().getString("lastDeeplink", ""); }
+    static void setLastDeeplink(String deeplink) { putQuiet("lastDeeplink", deeplink); }
+
+    /** The key of the last pick opened ("movie:123"), to restore the focus when coming back to the home screen. */
+    static String lastPickKey() { return sp().getString("lastPickKey", ""); }
+    static void setLastPickKey(String key) { putQuiet("lastPickKey", key); }
 
     // MARK: - Remote buttons
 

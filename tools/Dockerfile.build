@@ -1,0 +1,9 @@
+# Build image for FreeMyTV.apk: a JDK 17 (build.sh needs 17+) plus zip, which the JDK image lacks.
+# The Android SDK and the project are mounted at run time, not copied in: tools/build-docker.sh.
+FROM eclipse-temurin:17-jdk
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends zip unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work

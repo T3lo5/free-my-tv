@@ -104,6 +104,10 @@ final class Recs {
     private final Map<String, Backdrop> images = new LinkedHashMap<>();   // this hour's, built and ready to draw
     private final java.util.Set<String> pending = new java.util.HashSet<>();
     private volatile List<Pick> picks = new ArrayList<>();
+    /** Every title loaded this session, for the surprise: the home screen keeps only this hour's. */
+    private final Map<String, Pick> pool = new LinkedHashMap<>();
+    private static final int POOL_MAX = 300;
+    private Pick lastRandom;    // the title the surprise opened last, never the same twice in a row
     private volatile int period = -1;
     private volatile long listAt;
     private volatile boolean fetching;
@@ -120,6 +124,7 @@ final class Recs {
         try {
             String saved = cache.getString("picks", null);
             if (saved != null) picks = parse(new JSONArray(saved));
+            remember(picks);
             period = cache.getInt("period", -1);
             listAt = cache.getLong("listAt", 0);
             listLanguage = cache.getString("language", cache.getBoolean("english", false) ? "en" : "pt");
@@ -356,16 +361,32 @@ final class Recs {
         });
     }
 
-    /** A title at random, to surprise the person ("movie" or "tv"; null = either). */
+    /** A title at random from everything loaded this session ("movie" or "tv"; null = either). */
     Pick random(String kind) {
+        List<Pick> all;
+        synchronized (pool) { all = new ArrayList<>(pool.values()); }
         List<Pick> list = new ArrayList<>();
-        for (Pick p : picks) {
-            if (kind != null && !kind.equals(p.kind)) continue;
-            if (!p.detailed || p.pkg == null) continue;   // nothing to open it with
-            list.add(p);
-        }
+        for (Pick p : all) addRandom(list, p, kind);
+        if (list.isEmpty()) for (Pick p : picks) addRandom(list, p, kind);   // nothing remembered yet
         if (list.isEmpty()) return null;
-        return list.get((int) (Math.random() * list.size()));
+        int i = (int) (Math.random() * list.size());
+        if (list.size() > 1 && list.get(i) == lastRandom) i = (i + 1) % list.size();
+        lastRandom = list.get(i);
+        return lastRandom;
+    }
+
+    private static void addRandom(List<Pick> list, Pick p, String kind) {
+        if (kind != null && !kind.equals(p.kind)) return;
+        if (!p.detailed || p.pkg == null) return;   // nothing to open it with
+        list.add(p);
+    }
+
+    /** Keeps every title the home screen loaded (this hour's and the hours before, this session). */
+    private void remember(List<Pick> list) {
+        synchronized (pool) {
+            for (Pick p : list) pool.put(key(p), p);
+            while (pool.size() > POOL_MAX) pool.remove(pool.keySet().iterator().next());   // the oldest go
+        }
     }
 
     /** This hour's picks for the three tabs (Explore, Movies, Shows), without repeats. */
@@ -416,6 +437,7 @@ final class Recs {
         alternate(list, seen, newMovies, newShows, 24);
         if (list.isEmpty()) throw new IOException("TMDB returned no recommendations");
         picks = list;
+        remember(list);
         period = p;
         listAt = System.currentTimeMillis();
         listLanguage = Ui.language;

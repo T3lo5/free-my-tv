@@ -8,6 +8,7 @@ final class Spanish {
         switch (english) {
             case "Live TV": return "TV en vivo";
             case "All Apps": return "Todas las apps";
+            case "Continue": return "Continuar";
             case "Settings": return "Ajustes";
             case "Home Settings": return "Ajustes de inicio";
             case "TV Settings": return "Ajustes del TV";

@@ -60,6 +60,11 @@ About ten minutes. You need a Google TV or Android TV (Android 9 or newer) and a
    ./build.sh
    ```
    The first run creates `config.properties`. Set your city and your [TMDB key](#the-tmdb-key) there, then run it again.
+   No JDK on the machine? Docker can supply it; this runs the very same `build.sh` in a container (your Android SDK is
+   mounted from the host):
+   ```bash
+   tools/build-docker.sh
+   ```
 4. **Install:**
    ```bash
    adb connect 192.168.1.50:5555

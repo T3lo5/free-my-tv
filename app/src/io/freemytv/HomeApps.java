@@ -60,6 +60,8 @@ final class HomeApps {
     static final int SHUFFLE = 6;
     /** The "HDMI Inputs" button: opens the bottom drawer on the inputs (the home screen handles it). */
     static final int INPUTS = 7;
+    /** "Continuar": opens the last Nuvio deeplink saved by Prefs (hidden when there is none). */
+    static final int CONTINUE = 8;
     /** Image size of each card (16:9; on screen it shows up to ~330 px wide). */
     static final int TILE_W = 384, TILE_H = 216;
 
@@ -258,12 +260,30 @@ final class HomeApps {
     }
 
     /** Shortcuts in the bottom drawer. */
-    static List<Item> drawerShortcuts() {
+    static List<Item> drawerShortcuts(Context c) {
         List<Item> items = new ArrayList<>();
+        Item cont = continueItem(c);
+        if (cont != null) items.add(cont);
         items.add(shortcut(ALL_APPS, "all", Ui.tr("Todos os Apps", "All Apps"), "apps"));
         items.add(shortcut(SETTINGS, "settings", Ui.tr("Ajustes do Início", "Home Settings"), "settings"));
         items.add(shortcut(ANDROID_SETTINGS, "tv-settings", Ui.tr("Ajustes da TV", "TV Settings"), "tv_settings"));
         return items;
+    }
+
+    /** The "Continuar" item: the last Nuvio deeplink opened, or null when there is none to continue. */
+    static Item continueItem(Context c) {
+        String link = Prefs.lastDeeplink();
+        if (link == null || link.isEmpty()) return null;
+        String nuvio = nuvioPackage(c);
+        if (nuvio.isEmpty()) return null;   // the link is Nuvio's: without it there is nothing to continue
+        Item it = new Item();
+        it.kind = CONTINUE;
+        it.key = "continue";
+        it.label = Ui.tr("Continuar", "Continue");
+        it.symbol = "play";
+        it.deeplink = link;
+        it.pkg = nuvio;
+        return it;
     }
 
     /** A streaming service's app (the "Watch" button of the featured pick). */
@@ -409,7 +429,10 @@ final class HomeApps {
     static boolean open(Activity a, Item it, View from, int x, int y, int w, int h) {
         Intent intent = intentFor(a, it);
         if (intent == null) return false;
-        if (start(a, intent, from, x, y, w, h)) return true;
+        if (start(a, intent, from, x, y, w, h)) {
+            remember(it);
+            return true;
+        }
         // The title's own link did not open (an older Nuvio, say): open the app's front door instead of nothing.
         if (it.deeplink != null) {
             Intent front = launchIntent(a.getPackageManager(), it.pkg);
@@ -419,6 +442,11 @@ final class HomeApps {
             }
         }
         return false;
+    }
+
+    /** Remembers the title just opened, for "Continuar": only when it really opened. */
+    private static void remember(Item it) {
+        if (it.deeplink != null && !it.deeplink.isEmpty()) Prefs.setLastDeeplink(it.deeplink);
     }
 
     /** The intent that opens the item: the app's front door, or Nuvio's own link for the title. */
@@ -442,6 +470,11 @@ final class HomeApps {
                 return new Intent(Settings.ACTION_SETTINGS);
             case SHUFFLE:
                 return null;   // the home screen asks which kind and opens the title
+            case CONTINUE:
+                // The last Nuvio deeplink opened: keep watching where it left off.
+                String link = Prefs.lastDeeplink();
+                if (link == null || link.isEmpty()) return null;
+                return new Intent(Intent.ACTION_VIEW, Uri.parse(link)).setPackage(it.pkg);
             default:
                 return null;
         }

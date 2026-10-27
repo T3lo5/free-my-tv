@@ -2,6 +2,10 @@
 
 ## 1) Shuffle: sortear de todo conteúdo TMDB já consumido
 
+> **Status (27/10):** feito e **testado na TV** (sorteou "The Odyssey", que não estava nos cards visíveis). O pool vive no
+> `Recs` (`pool`, limite de 300 títulos por sessão) e é alimentado pela lista salva em disco e por cada hora nova;
+> `random()` sorteia dele, nunca repete o último título e cai para a lista visível quando o pool está vazio.
+
 **Problema**
 Hoje o botão "Sorteio" (`SHUFFLE`) escolhe aleatoriamente apenas dentre os conteúdos que estão visíveis/recomendados na tela. Seria muito mais interessante sortear de todo o conteúdo que já foi consumido pela API do TMDB nesta sessão.
 
@@ -61,6 +65,12 @@ Se mesmo com build `.tv`, boa conexão e TV "limpa" ainda travar, é provavelmen
 
 ## 3) UX sem bloat (ideias rápidas e seguras)
 
+> **Status (27/10):** "Continuar" no drawer e restauração do último foco feitos e **testados na TV**. O foco é guardado
+> pela chave do título (`movie:123`) e restaurado **ao voltar de um app** (HOME continua indo para a fileira de apps, como
+> antes); a lista usada é a dos cards, não o `picks` (ver item 6). "Continuar" só aparece com o Nuvio instalado, e o
+> deeplink só é gravado quando o título abre de verdade. Faltam os dois itens de baixo: "Continuar" no painel Sorteio e
+> app mais recente primeiro na Shelf (este mexe numa ordem que a pessoa escolheu — decidir antes de fazer).
+
 Baseado na pesquisa dos agentes (foco em "continuar assistindo" e atalhos reais, sem páginas novas):
 
 | Ideia | Arquivo(s) | Explicação | Risco |
@@ -73,6 +83,12 @@ Baseado na pesquisa dos agentes (foco em "continuar assistindo" e atalhos reais,
 **Recomendação:** iniciar por **"Continuar" no drawer** + **restaurar último foco** (maior impacto com menor alteração).
 
 ## 4) Performance (manter 60fps sem animações pesadas)
+
+> **Status (27/10):** o véu do drawer virou uma camada própria (um retângulo desenhado uma vez; por frame só muda a
+> opacidade) e o céu não é mais redesenhado a cada frame do drawer. Medido na TV (TCL G13, 1080p60, `gfxinfo`):
+> drawer p50 **34 → 28 ms** (p90 42 → 34), foco na fileira 18 ms, folha "Todos os Apps" 20 ms, e parado o app não
+> desenha nenhum frame. O que sobra no drawer é fill-rate da GPU (cinco camadas de tela cheia com alpha); baixar mais
+> pede outro desenho (animar um snapshot único), não micro-otimização.
 
 Melhorias concretas e de baixo risco para GPUs fracas (Mi Box 3/Mali):
 
@@ -99,3 +115,19 @@ em rede. Melhorar parsing de `dumpsys wifi` (regex mais robusto), logar quantida
 | **Reativação pós-update** | Risco pequeno | `verifyNow` não força reativação do serviço de acessibilidade. Sugerido adicionar verificação em `verifyNow` quando em modo Free + TCL suportado: garantir `ensureRemoteService`. | Baixo |
 | **Watchdog (3 crashes/5 min)** | Funciona bem | Zera contagem ao entrar em Free My TV, agenda revert pro Original. Sincronizar `record/recent/clear` com lock estático (race conditions raras). Garantir `Watchdog.install()` no processo `:home`. | Baixo |
 | **Volta pro Original** | Confiável | `applyOriginal` restaura `originalHome/originalDream`, religar apps, remove screensaver, desativa remote service. Depende de ADB e estado gravado. Checagens null-safe em `restoreHome/packageOf`. | Baixo |
+
+## 6) Achados no teste na TV (27/10, TCL G13_2K_GB, Android 14)
+
+- **`picks` morto no `HomeView`:** **resolvido (27/10) — removido.** O design claro substituiu o herói pela fileira de
+  cards, mas sobraram `Hero`, `picks`, `pickIndex`, `heroFocus`, `Z_HERO`, `refreshHero`/`makeHero`/`browse`,
+  `tickHeroFade` e o relógio do capsule (~126 linhas). Nada era alcançável: `currentPick()` devolvia sempre `null` e
+  `hero.button` era sempre falso. Sem mudança visual; os fluxos (foco nos cards, drawer + Continuar, Todos os Apps,
+  abas/Sorteio, voltar do app no card certo) foram testados na TV depois da remoção.
+- **`Prefs.put` incrementava `version`, e o `HomeActivity` recria a home** quando ela muda no `onResume`. Gravar qualquer
+  estado de tela em `Prefs` custava um `recreate()` inteiro ao voltar. Corrigido para `lastDeeplink`/`lastPickKey` com
+  `putQuiet` (escreve sem sujar a versão).
+- **O Nuvio ignora deeplink com o app já aberto:** com `com.nuvio.app` mostrando um título, abrir outro (pelo app ou por
+  `am start`) só traz o Nuvio para frente; ele não troca de título (`onNewIntent` chega, o app não navega). Com o app
+  fechado o link abre certo — os dois builds precisariam resolver isso (item 2).
+- **Para chegar nos botões do canto a aba mudava:** corrigido. A prévia ao passar pelas abas continua, mas a aba
+  selecionada ao entrar na fileira é restaurada quando o foco sai para os botões, e o OK numa aba passa a ser a que fica.
