@@ -203,9 +203,13 @@ final class Updater {
 
     private static void install(Context c, File apk) {
         String path = apk.getAbsolutePath();
+        // The package installer reads the APK as the system user, which cannot read /sdcard (SELinux); it can read
+        // /data/local/tmp, and the shell user is the one who can put it there. The whole thing runs detached: the
+        // install replaces this very process, and with it the ADB session that ordered it.
+        String command = "cp \"" + path + "\" /data/local/tmp/freemytv-update.apk"
+                + " && pm install -r /data/local/tmp/freemytv-update.apk";
         try (Adb adb = Adb.connect(c, 10_000, null)) {
-            // Detached: the install kills this process, and with it the ADB session that ordered it.
-            String out = adb.shell("setsid sh -c 'pm install -r \"" + path + "\"' </dev/null >/dev/null 2>&1 &");
+            String out = adb.shell("setsid sh -c '" + command.replace("'", "'\\''") + "' </dev/null >/dev/null 2>&1 &");
             AppLog.w("update " + apk.getName() + ": " + out.trim());
         } catch (IOException e) {
             AppLog.w("update install: " + e.getMessage());
