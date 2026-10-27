@@ -292,10 +292,11 @@ final class Games {
     /** The games of the day from API-Football: the football, with the crests and the league. */
     private List<Game> footballDay(long from, long to) throws IOException {
         List<Game> out = new ArrayList<>();
-        if (Config.API_FOOTBALL_KEY.trim().isEmpty()) return out;
+        String apiKey = Keys.football(context).trim();
+        if (apiKey.isEmpty()) return out;
         String tz = java.util.TimeZone.getDefault().getID();
         String url = APISPORTS + "fixtures?date=" + dashedDate(from) + "&timezone=" + tz.replace(" ", "%20");
-        JSONObject json = get(url, Config.API_FOOTBALL_KEY.trim());
+        JSONObject json = get(url, apiKey);
         JSONArray fixtures = json.optJSONArray("response");
         if (fixtures == null) return out;
         Map<String, String[]> byId = new HashMap<>();

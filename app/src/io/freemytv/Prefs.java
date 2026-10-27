@@ -136,6 +136,16 @@ final class Prefs {
     static long lastUpdateCheck() { return sp().getLong("updateAt", 0); }
     static void setLastUpdateCheck(long at) { putQuiet("updateAt", at); }
 
+    // MARK: - Keys
+
+    /** The TMDB read token: from config.properties on the first run, kept here afterwards. */
+    static String tmdbKey() { return sp().getString("tmdbKey", ""); }
+    static void setTmdbKey(String key) { put("tmdbKey", key); }
+
+    /** The API-Football key, same idea. */
+    static String footballKey() { return sp().getString("footballKey", ""); }
+    static void setFootballKey(String key) { put("footballKey", key); }
+
     // MARK: - Favourite teams
 
     /** The teams the person follows, by key ("flamengo"): their games come first on the home screen. */

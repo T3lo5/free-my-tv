@@ -49,6 +49,7 @@ final class Updater {
         Prefs.setLastUpdateCheck(System.currentTimeMillis());
         new Thread(() -> {
             try {
+                cleanOldFiles(app);
                 report(status, "Procurando…");
                 Release release = latest();
                 if (release == null || !release.newerThan(installedVersion(app))) {
@@ -70,6 +71,21 @@ final class Updater {
                 report(status, "Não deu: " + e.getMessage());
             }
         }, "update").start();
+    }
+
+    /** APKs left behind by earlier updates: once the install is done they are dead weight on the TV. */
+    private static void cleanOldFiles(Context c) {
+        File dir = c.getExternalFilesDir(null);
+        File[] files = dir == null ? null : dir.listFiles();
+        if (files == null) return;
+        long now = System.currentTimeMillis();
+        for (File file : files) {
+            String name = file.getName();
+            if (name.startsWith("update-") && name.endsWith(".apk") && now - file.lastModified() > 3600_000L) {
+                //noinspection ResultOfMethodCallIgnored
+                file.delete();
+            }
+        }
     }
 
     private static void report(Status status, String message) {

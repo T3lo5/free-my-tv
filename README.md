@@ -106,6 +106,11 @@ it carries them — so the releases published by CI are built **without** keys a
 release from CI is not a drop-in replacement for the APK on a TV that has your keys baked in: the picks would stop
 until the keys are provided again.
 
+That is what the app's preferences are for: the first run of a build made here copies the keys from
+`config.properties` into them, so a keyless release updates the TV and keeps the picks. On a TV with no keys at all,
+drop a file like `config.properties` named `freemytv-keys.txt` in the app's own folder
+(`/sdcard/Android/data/io.freemytv/files/`); the next start reads it and deletes it.
+
 ### The TMDB key
 
 Free, and it takes two minutes: create an account at [themoviedb.org](https://www.themoviedb.org/signup), then open [Settings → API](https://www.themoviedb.org/settings/api) and request a developer key. Paste the *API Read Access Token* (or the *API Key*) after `tmdb_key=`. It's your key: `config.properties` stays out of git.
