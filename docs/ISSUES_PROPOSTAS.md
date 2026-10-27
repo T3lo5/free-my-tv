@@ -177,6 +177,14 @@ dia (jogos, clima) fora da home.
   ser compilado onde a chave estiver (CI ou a máquina com `KEYSTORE_PATH`).
 - Alternativa sem mexer no OpenTV: só mostrar o canal (como hoje) — informativo, sem prometer abertura.
 
+**Feito (27/10), esperando a assinatura do OpenTV:**
+- OpenTV: `PlayRequests.channelName` + `EXTRA_PLAY_CHANNEL_NAME` + um `LaunchedEffect` que tenta cada nome em
+  `CatalogRepository.searchChannels` e navega para `Routes.player(id)`; se nenhum existir, abre a lista de canais. Sobe
+  para 0.13.0 (versionCode 28). Compila (`compileDebugKotlin`), mas instalar precisa da keystore de release.
+- Free My TV: `Iptv.canTune()` (só age com OpenTV ≥ 0.13) e `Iptv.tune()`, chamados no OK de um jogo. Sem a versão
+  nova, cai no aviso de sempre — testado na TV com o 0.12.6 instalado.
+- Os nomes vão como candidatos ("Premiere|SporTV|Globo"); "Paramount+" (streaming, não canal) não casa e cai na lista.
+
 ### Ordem sugerida
 
 1. **Trailer**, **"onde assistir"** e **apps recentes** — os três são pequenos, aparecem na hora e não mudam o desenho.

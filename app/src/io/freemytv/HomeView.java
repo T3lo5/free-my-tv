@@ -2022,9 +2022,11 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             it = HomeApps.app(p);
             r = cardRects[cardIndex];
         } else if (zone == Z_GAMES) {
-            // A game: its details (the time, the league and where it is on).
+            // A game: straight to the channel on the IPTV when it takes a channel by name (OpenTV 0.13+);
+            // otherwise its details (the time, the league and where it is on).
             if (gameIndex < 0 || gameIndex >= gameList.size()) return;
             Games.Game g = gameList.get(gameIndex);
+            if (!g.channel.isEmpty() && Iptv.canTune(getContext()) && Iptv.tune(getContext(), g.channel)) return;
             String where = g.channel.isEmpty() ? g.venue : g.channel;
             showToast(g.time() + " · " + g.match() + " · " + g.league
                     + (where.isEmpty() ? "" : " · " + where));
