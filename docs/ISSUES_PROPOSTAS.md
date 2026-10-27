@@ -137,3 +137,36 @@ Melhorias concretas e de baixo risco para GPUs fracas (Mi Box 3/Mali):
   fechado o link abre certo — os dois builds precisariam resolver isso (item 2).
 - **Para chegar nos botões do canto a aba mudava:** corrigido. A prévia ao passar pelas abas continua, mas a aba
   selecionada ao entrar na fileira é restaurada quando o foco sai para os botões, e o OK numa aba passa a ser a que fica.
+
+## 7) Próximas ideias: produtividade no uso e conteúdo
+
+O que o app ainda não tem (conferido no código, 27/10): busca própria, trailer, lista de "onde assistir" (o `Recs` lê
+`watch/providers` mas guarda só o primeiro serviço instalado), atualização sem computador, e nenhum uso dos dados do
+dia (jogos, clima) fora da home.
+
+### Para usar a TV no dia a dia
+
+| Ideia | Ganho | Como, no código | Esforço |
+| --- | --- | --- | --- |
+| **Atualizar o app pela própria TV** | Some o "precisa do computador" para atualizar: a TV baixa a release e instala sozinha | O app já tem o ADB interno (`Adb.shell`); falta empurrar o APK (≈1,2 MB) para `/data/local/tmp` em pedaços base64 e `pm install`, conferindo a assinatura antes | Médio/alto |
+| **"Todos os Apps" com os últimos usados primeiro** | Menos navegação para o app de sempre | Gravar a ordem em `Prefs` em `HomeApps.open` e ordenar em `others()` | Pequeno |
+| **Botões do controle para ações, não só apps** | Netflix pode abrir o Início, o Sorteio, o drawer — o que a pessoa quiser | Hoje só lista pacotes; aceitar "ações" junto (item especial no seletor) | Pequeno |
+| **Desligar a TV / timer de sono** | Útil à noite e com criança | `PowerManager`/`input keyevent` pelo ADB interno, com opção "em 30/60/90 min" | Médio |
+
+### Para melhorar o conteúdo
+
+| Ideia | Ganho | Como, no código | Esforço |
+| --- | --- | --- | --- |
+| **Trailer do título em destaque** | Decide antes de abrir o Nuvio e sem esperar o app carregar | TMDB `/movie|tv/{id}/videos` (já temos chave) → abrir o YouTube no vídeo | Pequeno |
+| **"Onde assistir" completo no card** | Saber em que serviço o título está, e abrir o certo | `Recs` já recebe `watch/providers`: guardar a lista (nome + pacote) e mostrar os ícones | Pequeno |
+| **Aba infantil** | Conteúdo seguro para criança, sem sair do modo da casa | TMDB discover com gênero 10762/certificação + esconder o resto; opcional PIN para sair | Médio |
+| **Jogo do dia abre o app do canal** | Do "Paramount+" na lista para o jogo, num OK | `Games` já traz o canal; mapa canal→pacote (os mesmos de `SERVICES`) | Pequeno/médio |
+| **Screensaver com o jogo do dia e o clima** | A tela de descanso passa a dizer algo do dia | `DreamView` + `Games.today()`/`HomeData.weather` | Pequeno |
+
+### Ordem sugerida
+
+1. **Trailer**, **"onde assistir"** e **apps recentes** — os três são pequenos, aparecem na hora e não mudam o desenho.
+2. **Jogo do dia abre o canal** — liga as duas metades que o app já tem (jogos + apps).
+3. **Atualizar pela TV** — o maior ganho de produtividade, e o de maior risco (instalar APK pelo ADB interno precisa de
+   validação de assinatura e de um caminho de volta se falhar).
+4. **Aba infantil** — só se fizer sentido para a casa; é a que mais mexe no desenho.
