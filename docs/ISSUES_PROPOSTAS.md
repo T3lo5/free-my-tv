@@ -158,10 +158,24 @@ dia (jogos, clima) fora da home.
 | Ideia | Ganho | Como, no código | Esforço |
 | --- | --- | --- | --- |
 | **Trailer do título em destaque** | Decide antes de abrir o Nuvio e sem esperar o app carregar | TMDB `/movie|tv/{id}/videos` (já temos chave) → abrir o YouTube no vídeo | Pequeno |
-| **"Onde assistir" completo no card** | Saber em que serviço o título está, e abrir o certo | `Recs` já recebe `watch/providers`: guardar a lista (nome + pacote) e mostrar os ícones | Pequeno |
+| ~~**"Onde assistir" completo no card**~~ | **Descartado (27/10):** a casa usa só Nuvio e YouCine, e o YouCine não tem link direto (`com.world.youcinetv` não declara `scheme`), então a lista de serviços do TMDB não serviria para nada | — | — |
 | **Aba infantil** | Conteúdo seguro para criança, sem sair do modo da casa | TMDB discover com gênero 10762/certificação + esconder o resto; opcional PIN para sair | Médio |
-| **Jogo do dia abre o app do canal** | Do "Paramount+" na lista para o jogo, num OK | `Games` já traz o canal; mapa canal→pacote (os mesmos de `SERVICES`) | Pequeno/médio |
+| **Jogo do dia abre o canal no IPTV** | Do jogo na lista para o canal, num OK | Não há link: nem `app.opentv` nem `com.world.youcinetv` declaram `scheme` próprio (conferido no `dumpsys package`). Precisa de uma ação no OpenTV (que é seu) — ver abaixo | Médio (dois repositórios) |
 | **Screensaver com o jogo do dia e o clima** | A tela de descanso passa a dizer algo do dia | `DreamView` + `Games.today()`/`HomeData.weather` | Pequeno |
+
+### Jogo do dia → canal: o que foi encontrado (27/10)
+
+- O "canal" da lista vem do ESPN e é a **rede dos EUA** (Paramount+, CBSSN, ESPN2), não a emissora brasileira.
+  Corrigido o que dava para corrigir sem inventar: a bandeira agora é a do **canal** (EUA), não a do país do jogo —
+  antes um jogo da Serie A aparecia com bandeira da Itália ao lado de "Paramount+".
+- **Não existe link direto** no OpenTV nem no YouCine. O caminho limpo é o OpenTV ganhar uma ação, por exemplo
+  `app.opentv.action.PLAY` com o nome do canal: ele já tem `ChannelNameNormalizer`, então procuraria o primeiro canal
+  que casasse e tocaria; sem casar, mostraria a lista. O Free My TV só mandaria o nome que já tem, e só quando
+  `resolveActivity` dissesse que essa ação existe (nada quebra enquanto o OpenTV não tiver).
+- **Tropeço real:** o OpenTV exige a keystore de release para instalar por cima (build de debug não substitui a
+  assinatura instalada). Ela não está nesta máquina, então o Free My TV pode ser preparado aqui, mas o OpenTV precisa
+  ser compilado onde a chave estiver (CI ou a máquina com `KEYSTORE_PATH`).
+- Alternativa sem mexer no OpenTV: só mostrar o canal (como hoje) — informativo, sem prometer abertura.
 
 ### Ordem sugerida
 

@@ -96,7 +96,7 @@ final class Games {
     /** How often the list is asked for again. */
     private static final long FRESH = 3 * 3600_000L;
     /** Bumped when what is saved changes (the old file is thrown away). */
-    private static final int VERSION = 4;
+    private static final int VERSION = 5;   // 5: the channel's country is the broadcaster's, not the league's
     /** Where the little flags come from (40 px wide, a few kB each). */
     private static final String FLAGS = "https://flagcdn.com/w40/";
 
@@ -351,8 +351,11 @@ final class Games {
             if (g.done) continue;
             JSONObject venue = comp.optJSONObject("venue");
             if (venue != null) g.venue = venue.optString("fullName");
-            g.channel = channel(comp);
-            g.channelCountry = channelCountry(comp);
+            // The name and where it is: ESPN's `broadcasts` are its own US networks, so a name from there is a US
+            // channel even when the match is in Italy (the flag used to say the league's country, which misled).
+            String[] on = channel(comp);
+            g.channel = on[0];
+            g.channelCountry = on[1];
             out.add(g);
         }
         return out;
@@ -364,8 +367,8 @@ final class Games {
         return path;
     }
 
-    /** Where it is on: the channel ESPN publishes for the game. */
-    private static String channel(JSONObject comp) {
+    /** Where it is on, as {channel, country}: the channel ESPN publishes for the game, and where it is. */
+    private static String[] channel(JSONObject comp) {
         JSONArray broadcasts = comp.optJSONArray("broadcasts");
         if (broadcasts != null) {
             for (int i = 0; i < broadcasts.length(); i++) {
@@ -374,7 +377,7 @@ final class Games {
                 JSONArray names = b.optJSONArray("names");
                 if (names == null || names.length() == 0) continue;
                 String name = names.optString(0);
-                if (!name.isEmpty()) return name;
+                if (!name.isEmpty()) return new String[] {name, "us"};   // ESPN's own feed: a US network
             }
         }
         JSONArray geo = comp.optJSONArray("geoBroadcasters");
@@ -383,29 +386,21 @@ final class Games {
                 JSONObject g = geo.optJSONObject(i);
                 if (g == null || g.optJSONObject("media") == null) continue;
                 String name = g.optJSONObject("media").optString("shortName");
-                if (!name.isEmpty()) return name;
+                if (!name.isEmpty()) return new String[] {name, channelCountry(g)};
             }
         }
-        return "";
+        return new String[] {"", ""};
     }
 
-    /** The country of that channel ("us", "br"...). */
-    private static String channelCountry(JSONObject comp) {
-        JSONArray geo = comp.optJSONArray("geoBroadcasters");
-        if (geo != null) {
-            for (int i = 0; i < geo.length(); i++) {
-                JSONObject g = geo.optJSONObject(i);
-                if (g == null) continue;
-                JSONObject media = g.optJSONObject("media");
-                if (media != null && media.optJSONObject("country") != null) {
-                    String code = media.optJSONObject("country").optString("code");
-                    if (!code.isEmpty()) return code.toLowerCase(Locale.ROOT);
-                }
-                String region = g.optString("region");
-                if (!region.isEmpty()) return region.toLowerCase(Locale.ROOT);
-            }
+    /** The country of a broadcaster ("us", "br"...). */
+    private static String channelCountry(JSONObject broadcaster) {
+        JSONObject media = broadcaster.optJSONObject("media");
+        if (media != null && media.optJSONObject("country") != null) {
+            String code = media.optJSONObject("country").optString("code");
+            if (!code.isEmpty()) return code.toLowerCase(Locale.ROOT);
         }
-        return "";
+        String region = broadcaster.optString("region");
+        return region.isEmpty() ? "" : region.toLowerCase(Locale.ROOT);
     }
 
     /** The flag of a country ("br" → the Brazilian flag). */
