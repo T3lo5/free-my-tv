@@ -715,6 +715,13 @@ public class SettingsActivity extends Activity {
             appLabels.clear();
             appPkgs.add("");
             appLabels.add(Ui.tr("Nada", "Nothing"));
+            // Actions, before the apps: the button can bring the home screen back, open the surprise or the drawer.
+            appPkgs.add(RemoteKeys.ACTION_HOME);
+            appLabels.add(Ui.tr("Início do Free My TV", "Free My TV home"));
+            appPkgs.add(RemoteKeys.ACTION_SHUFFLE);
+            appLabels.add(Ui.tr("Sorteio", "Shuffle"));
+            appPkgs.add(RemoteKeys.ACTION_DRAWER);
+            appLabels.add(Ui.tr("Gaveta (apps e entradas)", "Drawer (apps and inputs)"));
             for (String[] f : found) {
                 appPkgs.add(f[0]);
                 appLabels.add(f[1]);

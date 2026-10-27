@@ -391,6 +391,20 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         spoken.readAgain();
     }
 
+    /** From a remote button: open the home straight into the surprise panel, or into the drawer. */
+    static final String EXTRA_SHUFFLE = "freemytv.shuffle", EXTRA_DRAWER = "freemytv.drawer";
+
+    void openShufflePanel() {
+        if (!drawerOpen) openShuffle();
+    }
+
+    void openDrawerPanel() {
+        if (drawerItems.isEmpty()) return;
+        closeSheet();
+        openDrawer();
+        retarget(false);
+    }
+
     void pause() {
         if (!running) return;
         running = false;

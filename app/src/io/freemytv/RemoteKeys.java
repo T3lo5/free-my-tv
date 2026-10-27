@@ -51,9 +51,31 @@ final class RemoteKeys {
         }
         String pkg = Prefs.keyApp(code);
         if (pkg.isEmpty()) return;   // "Nothing": the key goes on as if we weren't here
+        if (pkg.startsWith("action:")) {   // not an app: something the home screen does
+            runAction(c, pkg);
+            return;
+        }
         Intent intent = HomeApps.launchIntent(c.getPackageManager(), pkg);
         AppLog.w("remote key " + code + " -> " + pkg + (intent == null ? " (not installed)" : ""));
         if (intent != null) c.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+    }
+
+    /** The actions a remote button can run instead of opening an app. */
+    static final String ACTION_HOME = "action:home", ACTION_SHUFFLE = "action:shuffle",
+            ACTION_DRAWER = "action:drawer";
+
+    private static void runAction(Context c, String action) {
+        Intent intent = new Intent(Intent.ACTION_MAIN)
+                .setComponent(android.content.ComponentName.unflattenFromString(HomeMode.HOME_ACTIVITY))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+        if (ACTION_SHUFFLE.equals(action)) intent.putExtra(HomeView.EXTRA_SHUFFLE, true);
+        if (ACTION_DRAWER.equals(action)) intent.putExtra(HomeView.EXTRA_DRAWER, true);
+        try {
+            c.startActivity(intent);
+            AppLog.w("remote key -> " + action);
+        } catch (android.content.ActivityNotFoundException | SecurityException e) {
+            AppLog.w("remote key " + action + ": " + e.getMessage());
+        }
     }
 
     /** The buttons of a game controller: a gamepad's, not the remote's. */

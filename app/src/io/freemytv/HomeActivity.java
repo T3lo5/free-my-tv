@@ -37,6 +37,15 @@ public class HomeActivity extends Activity {
         Ui.init(this);
         home = new HomeView(this);
         setContentView(home);
+        // Started by a remote button (the home was not running): the same intent, once the view is up.
+        final boolean shuffle = getIntent().getBooleanExtra(HomeView.EXTRA_SHUFFLE, false);
+        final boolean drawer = getIntent().getBooleanExtra(HomeView.EXTRA_DRAWER, false);
+        if (shuffle || drawer) {
+            home.post(() -> {
+                if (shuffle) home.openShufflePanel();
+                if (drawer) home.openDrawerPanel();
+            });
+        }
         getWindow().setBackgroundDrawable(null);
     }
 
@@ -59,7 +68,10 @@ public class HomeActivity extends Activity {
     /** Home button pressed on the home screen: back to the entry state (focus on the first app, sheet closed). */
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        if (home != null) home.reset(true);
+        if (home == null) return;
+        home.reset(true);
+        if (intent.getBooleanExtra(HomeView.EXTRA_SHUFFLE, false)) home.openShufflePanel();
+        if (intent.getBooleanExtra(HomeView.EXTRA_DRAWER, false)) home.openDrawerPanel();
     }
 
     @Override protected void onDestroy() {
