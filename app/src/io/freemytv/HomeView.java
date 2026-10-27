@@ -149,6 +149,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private final Spring[] gameFocus = new Spring[12];
     private boolean shuffleOpen;
     private int shuffleChoice;
+    private boolean shuffleHasContinue;   // the surprise panel also offers the last title opened
     private Paint lTitle, lTab, lTabOn, lCardTitle, lCardMeta, lQuote, lTip, lGame, lGameTime, lGameLeague, lGameChannel;
     private Paint lShuffle, lShuffleOn;
     private final Paint crestPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
@@ -1670,17 +1671,21 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     }
 
     /**
-     * The surprise: a glass panel with the two kinds ("Movie" / "Series"). The arrows choose, OK opens a random
-     * title of that kind (in Nuvio, on the title itself).
+     * The surprise: a glass panel with the two kinds ("Movie" / "Series") and, when there is one, the last title
+     * opened ("Continue"). The arrows choose, OK opens a random title of that kind (in Nuvio, on the title itself).
      */
     private void drawShuffle(Canvas c) {
         applyTone();
-        String[] options = {Ui.tr("Filme", "Movie", "Película"), Ui.tr("Série", "Series", "Serie")};
-        float w = 720 * k, h = 96 * k, x = (this.w - w) / 2, y = 72 * k;
+        int n = shuffleHasContinue ? 3 : 2;
+        String[] options = n == 3
+                ? new String[] {Ui.tr("Filme", "Movie", "Película"), Ui.tr("Série", "Series", "Serie"),
+                        Ui.tr("Continuar", "Continue")}
+                : new String[] {Ui.tr("Filme", "Movie", "Película"), Ui.tr("Série", "Series", "Serie")};
+        float w = (n == 3 ? 960 : 720) * k, h = 96 * k, x = (this.w - w) / 2, y = 72 * k;
         tmp.set(x, y, x + w, y + h);
         scene.glass(c, tmp, 28 * k, SMOKE, 0.55f, 0, 0, 0.02f, 1);
-        float half = w / 2;
-        for (int i = 0; i < 2; i++) {
+        float half = w / n;
+        for (int i = 0; i < n; i++) {
             boolean on = i == shuffleChoice;
             if (on) {
                 cell.set(x + i * half + 14 * k, y + 14 * k, x + (i + 1) * half - 14 * k, y + h - 14 * k);
@@ -1694,8 +1699,9 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
     }
 
-    /** The surprise: opens the panel with the two kinds. */
+    /** The surprise: opens the panel with the two kinds, plus the last title when there is one to continue. */
     private void openShuffle() {
+        shuffleHasContinue = HomeApps.continueItem(getContext()) != null;
         shuffleOpen = true;
         shuffleChoice = 0;
         toastLayer.invalidate();
@@ -1706,9 +1712,17 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         toastLayer.invalidate();
     }
 
-    /** A title at random (a movie or a series), opened in Nuvio on the title itself. */
+    /** A title at random (a movie or a series), or the last one opened, in Nuvio on the title itself. */
     private void shuffle() {
         closeShuffle();
+        if (shuffleHasContinue && shuffleChoice == 2) {
+            HomeApps.Item last = HomeApps.continueItem(getContext());
+            if (last != null && !HomeApps.open(activity, last, this, Math.round(w / 2f - 200 * k),
+                    Math.round(h / 2f - 110 * k), Math.round(400 * k), Math.round(220 * k))) {
+                showToast(Ui.tr("Não deu para continuar.", "Couldn't continue."));
+            }
+            return;
+        }
         Recs.Pick p = recs.random(shuffleChoice == 0 ? "movie" : "tv");
         if (p == null || p.pkg == null) {
             showToast(Ui.tr("Nenhum título por enquanto.", "No titles yet."));
@@ -1795,13 +1809,13 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
             switch (e.getKeyCode()) {
                 case KeyEvent.KEYCODE_DPAD_LEFT:
                     if (down) {
-                        shuffleChoice = 0;
+                        shuffleChoice = Math.max(0, shuffleChoice - 1);
                         toastLayer.invalidate();
                     }
                     return true;
                 case KeyEvent.KEYCODE_DPAD_RIGHT:
                     if (down) {
-                        shuffleChoice = 1;
+                        shuffleChoice = Math.min(shuffleHasContinue ? 2 : 1, shuffleChoice + 1);
                         toastLayer.invalidate();
                     }
                     return true;

@@ -448,6 +448,9 @@ final class HomeMode {
         Set<String> owners = new HashSet<>();
         Matcher m = Pattern.compile("cname=([\\w.]+)").matcher(adb.shell("dumpsys wifi | grep -o 'cname=[^ ]*'"));
         while (m.find()) owners.add(m.group(1));
+        // Android 14 names the owner by uid ("android.uid.system:1000"), not by package, so the package guard below
+        // cannot match it. What we find here is what that guard sees: worth a line in the log when a switch misbehaves.
+        AppLog.w("wifi owners: " + owners);
         return owners;
     }
 

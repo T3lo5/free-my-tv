@@ -68,8 +68,9 @@ Se mesmo com build `.tv`, boa conexão e TV "limpa" ainda travar, é provavelmen
 > **Status (27/10):** "Continuar" no drawer e restauração do último foco feitos e **testados na TV**. O foco é guardado
 > pela chave do título (`movie:123`) e restaurado **ao voltar de um app** (HOME continua indo para a fileira de apps, como
 > antes); a lista usada é a dos cards, não o `picks` (ver item 6). "Continuar" só aparece com o Nuvio instalado, e o
-> deeplink só é gravado quando o título abre de verdade. Faltam os dois itens de baixo: "Continuar" no painel Sorteio e
-> app mais recente primeiro na Shelf (este mexe numa ordem que a pessoa escolheu — decidir antes de fazer).
+> deeplink só é gravado quando o título abre de verdade. "Continuar" também entrou no painel Sorteio (três opções: Filme, Série e Continuar, esta só quando há um
+> último título; testado na TV). Fica de fora só "app mais recente primeiro na Shelf": mexe numa ordem que a pessoa
+> escolheu de propósito, então é decisão de produto, não de código.
 
 Baseado na pesquisa dos agentes (foco em "continuar assistindo" e atalhos reais, sem páginas novas):
 
@@ -107,12 +108,11 @@ Melhorias concretas e de baixo risco para GPUs fracas (Mi Box 3/Mali):
 
 | Ponto | Status | Observação / Correção mínima |
 | --- | --- | --- |
-| **Proteção Wi-Fi (`wifiOwners`)** | Bom, mas frágil | Já impede desligar app que salvar
-em rede. Melhorar parsing de `dumpsys wifi` (regex mais robusto), logar quantidade de `cname=` encontrados e checagens null-safe em `packageOf`. | Baixo |
+| **Proteção Wi-Fi (`wifiOwners`)** | Verificado na TV (27/10) | Nesta TCL/Android 14 o `dumpsys wifi` traz `cname=android.uid.system:1000`, um **uid**, não um pacote — a checagem por pacote não casa, e não precisa: a rede é do sistema, não de um app que o switch desliga. O log agora mostra `wifi owners: [...]` para diagnosticar em outra TV, onde o `cname` pode ser pacote. | Baixo |
 | **DEBLOAT/PROTECTED** | Correto | Bem alinhado com README. Manter padrão "adicionar por marca" ao adaptar para outra TV. |
 | **Appops TCL (AUTO_START)** | Externo ao app | Se não feito via `adb shell` na instalação, `TclAppBoot` pode bloquear `ModeJob`. Continuar como instrução de instalação. |
 | **Botões remotos TCL** | Funciona bem | Aprendizado por acessibilidade + broadcast dinâmico (`com.tcl.TCLkeyevent`, `tcl.sys.intent.action.USERSTATE_KEYDOWN`) cobre códigos variáveis. Serviço precisa estar habilitado. |
-| **Reativação pós-update** | Risco pequeno | `verifyNow` não força reativação do serviço de acessibilidade. Sugerido adicionar verificação em `verifyNow` quando em modo Free + TCL suportado: garantir `ensureRemoteService`. | Baixo |
+| **Reativação pós-update** | Verificado na TV (27/10) | Não precisa de mudança: o `HomeReceiver` já chama `ensureRemoteService(3 s)` em `MY_PACKAGE_REPLACED`. Teste real: apaguei o serviço de `enabled_accessibility_services`, reinstalei o APK e ele voltou sozinho (com os outros serviços preservados). | Baixo |
 | **Watchdog (3 crashes/5 min)** | Funciona bem | Zera contagem ao entrar em Free My TV, agenda revert pro Original. Sincronizar `record/recent/clear` com lock estático (race conditions raras). Garantir `Watchdog.install()` no processo `:home`. | Baixo |
 | **Volta pro Original** | Confiável | `applyOriginal` restaura `originalHome/originalDream`, religar apps, remove screensaver, desativa remote service. Depende de ADB e estado gravado. Checagens null-safe em `restoreHome/packageOf`. | Baixo |
 
