@@ -209,9 +209,13 @@ final class Updater {
         String command = "cp \"" + path + "\" /data/local/tmp/freemytv-update.apk"
                 + " && pm install -r /data/local/tmp/freemytv-update.apk";
         try (Adb adb = Adb.connect(c, 10_000, null)) {
-            String out = adb.shell("setsid sh -c '" + command.replace("'", "'\\''") + "' </dev/null >/dev/null 2>&1 &");
+            // Not detached: a background command dies with the connection when this process is replaced. Run in the
+            // foreground, the package is installed before the system kills us; the output is usually lost with the
+            // process, and that is fine.
+            String out = adb.shell(command);
             AppLog.w("update " + apk.getName() + ": " + out.trim());
         } catch (IOException e) {
+            // The connection dies as the app is replaced: expected when the install worked.
             AppLog.w("update install: " + e.getMessage());
         }
     }
