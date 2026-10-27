@@ -195,6 +195,16 @@ dia (jogos, clima) fora da home.
   que não dizer nada).
 - O log de `HTTP 404` do ESPN acabou: competição sem caminho no ESPN (Copa do Brasil, Libertadores) não é mais pedida.
 
+### Pipeline e atualização automática (feito em 27/10)
+
+- CI: `build.yml` a cada push, `release.yml` numa tag `v*` — compila, assina com a keystore dos secrets e publica o release.
+- **O app se atualiza sozinho**: uma vez por dia ao voltar para o Início (ou pelo botão *Ajustes → Procurar atualização*),
+  ele consulta o release mais recente, baixa o APK, **confere a assinatura** (se não for a mesma, recusa) e instala pelo
+  ADB interno. Testado de ponta a ponta na TV: 1.3.6 → 1.3.7 sem computador.
+- Dois tropeços que só a TV mostrou: o `pm install` não lê `/sdcard` (SELinux — tem que copiar para `/data/local/tmp`
+  antes) e um comando em segundo plano morre junto com a conexão quando o app é substituído; a instalação agora é
+  síncrona.
+
 ### Ordem sugerida
 
 1. **Trailer**, **"onde assistir"** e **apps recentes** — os três são pequenos, aparecem na hora e não mudam o desenho.
