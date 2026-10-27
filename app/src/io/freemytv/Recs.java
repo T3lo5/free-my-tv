@@ -586,6 +586,31 @@ final class Recs {
         return stamp * 31L + (nuvio.isEmpty() ? 0 : nuvio.hashCode());
     }
 
+    /** The YouTube trailer for a pick, or null when TMDB has none (or there is no key). */
+    String trailer(Pick p) {
+        if (p == null) return null;
+        try {
+            org.json.JSONObject o = get("/" + p.kind + "/" + p.id + "/videos?language=" + lang());
+            org.json.JSONArray results = o.optJSONArray("results");
+            String fallback = null;
+            for (int i = 0; results != null && i < results.length(); i++) {
+                org.json.JSONObject v = results.optJSONObject(i);
+                if (v == null || !"YouTube".equals(v.optString("site"))) continue;
+                String key = v.optString("key");
+                if (key.isEmpty()) continue;
+                String type = v.optString("type");
+                if ("Trailer".equals(type)) return "https://www.youtube.com/watch?v=" + key;
+                if (fallback == null && ("Teaser".equals(type) || "Clip".equals(type))) {
+                    fallback = "https://www.youtube.com/watch?v=" + key;
+                }
+            }
+            return fallback;
+        } catch (Exception e) {
+            AppLog.w("trailer: " + e.getMessage());
+            return null;
+        }
+    }
+
     private JSONObject get(String path) throws IOException, org.json.JSONException {
         String key = readKey();
         if (key == null) throw new IOException("no TMDB key");

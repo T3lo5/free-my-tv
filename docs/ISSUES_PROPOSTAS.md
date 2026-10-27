@@ -140,15 +140,14 @@ Melhorias concretas e de baixo risco para GPUs fracas (Mi Box 3/Mali):
 
 ## 7) Próximas ideias: produtividade no uso e conteúdo
 
-O que o app ainda não tem (conferido no código, 27/10): busca própria, trailer, lista de "onde assistir" (o `Recs` lê
-`watch/providers` mas guarda só o primeiro serviço instalado), atualização sem computador, e nenhum uso dos dados do
-dia (jogos, clima) fora da home.
+O que o app ainda não tem (conferido no código, 27/10): busca própria, aba infantil, e os atalhos por uso. O trailer,
+o jogo do dia na tela de descanso e a atualização sem computador já entraram (ver o fim desta seção).
 
 ### Para usar a TV no dia a dia
 
 | Ideia | Ganho | Como, no código | Esforço |
 | --- | --- | --- | --- |
-| **Atualizar o app pela própria TV** | Some o "precisa do computador" para atualizar: a TV baixa a release e instala sozinha | O app já tem o ADB interno (`Adb.shell`); falta empurrar o APK (≈1,2 MB) para `/data/local/tmp` em pedaços base64 e `pm install`, conferindo a assinatura antes | Médio/alto |
+| ~~**Atualizar o app pela própria TV**~~ | **Feito (27/10):** a TV baixa o release, confere a assinatura e instala pelo ADB interno; testado de 1.3.6 para 1.3.7 sem computador | — | — |
 | **"Todos os Apps" com os últimos usados primeiro** | Menos navegação para o app de sempre | Gravar a ordem em `Prefs` em `HomeApps.open` e ordenar em `others()` | Pequeno |
 | **Botões do controle para ações, não só apps** | Netflix pode abrir o Início, o Sorteio, o drawer — o que a pessoa quiser | Hoje só lista pacotes; aceitar "ações" junto (item especial no seletor) | Pequeno |
 | **Desligar a TV / timer de sono** | Útil à noite e com criança | `PowerManager`/`input keyevent` pelo ADB interno, com opção "em 30/60/90 min" | Médio |
@@ -157,11 +156,11 @@ dia (jogos, clima) fora da home.
 
 | Ideia | Ganho | Como, no código | Esforço |
 | --- | --- | --- | --- |
-| **Trailer do título em destaque** | Decide antes de abrir o Nuvio e sem esperar o app carregar | TMDB `/movie|tv/{id}/videos` (já temos chave) → abrir o YouTube no vídeo | Pequeno |
+| ~~**Trailer do título em destaque**~~ | **Feito (27/10):** no drawer, ao lado de *Continuar*; o TMDB dá o vídeo e o YouTube abre nele | — | — |
 | ~~**"Onde assistir" completo no card**~~ | **Descartado (27/10):** a casa usa só Nuvio e YouCine, e o YouCine não tem link direto (`com.world.youcinetv` não declara `scheme`), então a lista de serviços do TMDB não serviria para nada | — | — |
 | **Aba infantil** | Conteúdo seguro para criança, sem sair do modo da casa | TMDB discover com gênero 10762/certificação + esconder o resto; opcional PIN para sair | Médio |
 | **Jogo do dia abre o canal no IPTV** | Do jogo na lista para o canal, num OK | Não há link: nem `app.opentv` nem `com.world.youcinetv` declaram `scheme` próprio (conferido no `dumpsys package`). Precisa de uma ação no OpenTV (que é seu) — ver abaixo | Médio (dois repositórios) |
-| **Screensaver com o jogo do dia e o clima** | A tela de descanso passa a dizer algo do dia | `DreamView` + `Games.today()`/`HomeData.weather` | Pequeno |
+| ~~**Screensaver com o jogo do dia e o clima**~~ | **Feito (27/10):** o próximo jogo aparece no canto inferior direito (ex.: "AS Roma x Cagliari · 16:45 · Paramount+") | — | — |
 
 ### Jogo do dia → canal: o que foi encontrado (27/10)
 
@@ -177,13 +176,17 @@ dia (jogos, clima) fora da home.
   ser compilado onde a chave estiver (CI ou a máquina com `KEYSTORE_PATH`).
 - Alternativa sem mexer no OpenTV: só mostrar o canal (como hoje) — informativo, sem prometer abertura.
 
-**Feito (27/10), esperando a assinatura do OpenTV:**
+**Feito (27/10) e já publicado:**
 - OpenTV: `PlayRequests.channelName` + `EXTRA_PLAY_CHANNEL_NAME` + um `LaunchedEffect` que tenta cada nome em
-  `CatalogRepository.searchChannels` e navega para `Routes.player(id)`; se nenhum existir, abre a lista de canais. Sobe
-  para 0.13.0 (versionCode 28). Compila (`compileDebugKotlin`), mas instalar precisa da keystore de release.
+  `CatalogRepository.searchChannels` e navega para `Routes.player(id)`; se nenhum existir, abre a lista de canais.
+  Saiu nas 0.13.0–0.13.2 pelo CI do OpenTV (a keystore está nos secrets de lá) e foi testado na TV: o jogo da ESPN2
+  abriu a **ESPN 2** do IPTV.
 - Free My TV: `Iptv.canTune()` (só age com OpenTV ≥ 0.13) e `Iptv.tune()`, chamados no OK de um jogo. Sem a versão
   nova, cai no aviso de sempre — testado na TV com o 0.12.6 instalado.
 - Os nomes vão como candidatos ("Premiere|SporTV|Globo"); "Paramount+" (streaming, não canal) não casa e cai na lista.
+- Dois defeitos que o teste na TV revelou e que já estão corrigidos: o efeito cancelava a si mesmo ao consumir o pedido
+  (0.13.2), e o casamento exigia o nome exato ("ESPN2" não achava "ESPN 2") — agora tenta as grafias e compara pela
+  chave que agrupa as qualidades (0.13.1).
 
 ### Feito (27/10, na TV)
 
@@ -194,6 +197,7 @@ dia (jogos, clima) fora da home.
   trazem a emissora brasileira na tabela; as europeias ficam sem palpite (direitos mudam de ano em ano e chutar é pior
   que não dizer nada).
 - O log de `HTTP 404` do ESPN acabou: competição sem caminho no ESPN (Copa do Brasil, Libertadores) não é mais pedida.
+- **Trailer do destaque** no drawer, e o **próximo jogo na tela de descanso** (canto inferior direito, com hora e canal).
 
 ### Pipeline e atualização automática (feito em 27/10)
 

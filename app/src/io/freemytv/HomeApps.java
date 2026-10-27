@@ -62,6 +62,8 @@ final class HomeApps {
     static final int INPUTS = 7;
     /** "Continuar": opens the last Nuvio deeplink saved by Prefs (hidden when there is none). */
     static final int CONTINUE = 8;
+    /** "Trailer": plays the featured title's trailer on YouTube (TMDB has the video). */
+    static final int TRAILER = 9;
     /** Image size of each card (16:9; on screen it shows up to ~330 px wide). */
     static final int TILE_W = 384, TILE_H = 216;
 
@@ -264,6 +266,7 @@ final class HomeApps {
         List<Item> items = new ArrayList<>();
         Item cont = continueItem(c);
         if (cont != null) items.add(cont);
+        if (Recs.hasKey(c)) items.add(shortcut(TRAILER, "trailer", Ui.tr("Trailer", "Trailer"), "play"));
         items.add(shortcut(ALL_APPS, "all", Ui.tr("Todos os Apps", "All Apps"), "apps"));
         items.add(shortcut(SETTINGS, "settings", Ui.tr("Ajustes do Início", "Home Settings"), "settings"));
         items.add(shortcut(ANDROID_SETTINGS, "tv-settings", Ui.tr("Ajustes da TV", "TV Settings"), "tv_settings"));

@@ -121,7 +121,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
     private float k = 1;
     private long minute = -1;
     private String clock = "", date = "";
-    private Paint datePaint, clockPaint, weatherPaint, weatherDim, quotePaint, stalePaint;
+    private Paint datePaint, clockPaint, weatherPaint, weatherDim, quotePaint, stalePaint, gamePaint;
     private Paint cornerDate, cornerQuote, cornerStale, cornerClock, labelPaint, metaPaint;
     private TextPaint titlePaint;
 
@@ -236,6 +236,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
         cornerDate = Ui.numbers(Ui.semibold, 30 * k, 0xEBFFFFFF);
         cornerQuote = Ui.numbers(Ui.regular, 23 * k, 0xC7FFFFFF);
         cornerStale = Ui.text(Ui.medium, 21 * k, 0x99FFFFFF);
+        gamePaint = Ui.text(Ui.regular, 26 * k, 0xB3FFFFFF);
         cornerClock = Ui.numbers(Ui.displaySemibold, CLOCK_SIZE * k, 0xF2FFFFFF);
         labelPaint = Ui.text(Ui.medium, 25 * k, 0xB8FFFFFF);
         labelPaint.setLetterSpacing(0.1f);
@@ -496,6 +497,16 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
 
     // MARK: - Corner: date and weather, glass clock, prices
 
+    /** "Flamengo x Palmeiras · 21:30 · Premiere", the first game still to come (empty when there is none). */
+    private String nextGame() {
+        long now = System.currentTimeMillis();
+        for (Games.Game g : Games.get(getContext()).today()) {
+            if (g.done || g.at + 2 * 3600_000L < now) continue;   // already over
+            return g.match() + " · " + g.time() + (g.channel.isEmpty() ? "" : " · " + g.channel);
+        }
+        return "";
+    }
+
     private void recordChrome() {
         Canvas c = chrome.beginRecording(w, h);
         try {
@@ -547,6 +558,10 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
             }
             String stale = HomeData.staleness(data.pricesAt, 5 * 60_000L);
             if (!stale.isEmpty() && n > 0) c.drawText(stale, right - total - 24 * k - cornerStale.measureText(stale), base, cornerStale);
+
+            // The next game of the day, bottom right: the screensaver says something about the day, not only the time.
+            String game = nextGame();
+            if (!game.isEmpty()) c.drawText(game, right - gamePaint.measureText(game), META_BASE * k, gamePaint);
         } finally {
             chrome.endRecording();
         }

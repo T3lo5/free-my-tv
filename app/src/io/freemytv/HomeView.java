@@ -1,8 +1,11 @@
 package io.freemytv;
 
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.graphics.Bitmap;
 import android.graphics.BitmapShader;
 import android.graphics.BlurMaskFilter;
@@ -1747,6 +1750,32 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         }
     }
 
+    /** The trailer of the card under the focus, on YouTube: TMDB knows the video, the TV has the app. */
+    private void openTrailer() {
+        Recs.Pick p = cardIndex < cards.size() ? cards.get(cardIndex) : null;
+        if (p == null) return;
+        LOADER.execute(() -> {
+            final String url = recs.trailer(p);
+            handler.post(() -> {
+                if (!running) return;
+                if (url == null) {
+                    showToast(Ui.tr("Sem trailer para este título.", "No trailer for this title."));
+                    return;
+                }
+                Intent you = new Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                try {
+                    activity.startActivity(new Intent(you).setPackage("com.google.android.youtube.tv"));
+                } catch (ActivityNotFoundException | SecurityException e) {
+                    try {
+                        activity.startActivity(you);
+                    } catch (ActivityNotFoundException | SecurityException e2) {
+                        showToast(Ui.tr("Não deu para abrir o trailer.", "Couldn't open the trailer."));
+                    }
+                }
+            });
+        });
+    }
+
     /** The games of the day: the list changed. */
     private void updateGames() {
         gameList = games.today();
@@ -2008,6 +2037,10 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         } else if (zone == Z_DRAWER) {
             if (drawerItems.isEmpty()) return;
             it = drawerItems.get(drawerIndex);
+            if (it.kind == HomeApps.TRAILER) {   // not an app: the trailer of the card in front of you
+                openTrailer();
+                return;
+            }
             r = drawerRects[drawerIndex];
         } else if (zone == Z_TOP) {
             if (topIndex < 4) {
